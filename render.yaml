@@ -104,7 +104,7 @@ services:
 
   - type: static_site
     name: lavasys-frontend
-    rootDir: lavasys---sistema-de-faturação-de-lavandaria (2)
+    rootDir: frontend
     buildCommand: npm ci && npm run build
     staticPublishPath: ./dist
     pullRequestPreviewsEnabled: false
