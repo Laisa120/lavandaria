@@ -1,0 +1,19 @@
+FROM php:8.2-cli
+
+RUN apt-get update && apt-get install -y \
+    git curl zip unzip libpng-dev libonig-dev libxml2-dev libzip-dev \
+    && docker-php-ext-install pdo_mysql mbstring bcmath pcntl exif zip \
+    && pecl install redis \
+    && docker-php-ext-enable redis
+
+COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
+
+WORKDIR /var/www
+
+COPY . /var/www
+
+RUN composer install --no-dev --optimize-autoloader --no-interaction
+
+EXPOSE 10000
+
+CMD sh -c 'php artisan migrate --force && php artisan config:clear && php artisan config:cache && php artisan serve --host=0.0.0.0 --port=${PORT:-10000}'

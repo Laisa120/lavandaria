@@ -1,0 +1,113 @@
+services:
+  - type: web
+    name: lavasys-backend
+    env: docker
+    rootDir: backend
+    dockerfilePath: ./Dockerfile.render
+    plan: starter
+    autoDeploy: true
+    healthCheckPath: /up
+    envVars:
+      - key: APP_ENV
+        value: production
+      - key: APP_DEBUG
+        value: "false"
+      - key: APP_URL
+        sync: false
+      - key: APP_KEY
+        generateValue: true
+      - key: LOG_CHANNEL
+        value: stack
+      - key: LOG_LEVEL
+        value: info
+      - key: DB_CONNECTION
+        value: mysql
+      - key: DB_HOST
+        sync: false
+      - key: DB_PORT
+        value: "3306"
+      - key: DB_DATABASE
+        sync: false
+      - key: DB_USERNAME
+        sync: false
+      - key: DB_PASSWORD
+        sync: false
+      - key: CACHE_STORE
+        value: redis
+      - key: SESSION_DRIVER
+        value: redis
+      - key: REDIS_CLIENT
+        value: phpredis
+      - key: REDIS_HOST
+        fromService:
+          type: redis
+          name: lavasys-redis
+          property: host
+      - key: REDIS_PORT
+        fromService:
+          type: redis
+          name: lavasys-redis
+          property: port
+      - key: FRONTEND_URL
+        sync: false
+
+  - type: worker
+    name: lavasys-queue
+    env: docker
+    rootDir: backend
+    dockerfilePath: ./Dockerfile.render
+    plan: starter
+    autoDeploy: true
+    startCommand: php artisan queue:work --sleep=1 --tries=3 --timeout=120
+    envVars:
+      - key: APP_ENV
+        value: production
+      - key: APP_DEBUG
+        value: "false"
+      - key: APP_URL
+        sync: false
+      - key: APP_KEY
+        sync: false
+      - key: DB_CONNECTION
+        value: mysql
+      - key: DB_HOST
+        sync: false
+      - key: DB_PORT
+        value: "3306"
+      - key: DB_DATABASE
+        sync: false
+      - key: DB_USERNAME
+        sync: false
+      - key: DB_PASSWORD
+        sync: false
+      - key: CACHE_STORE
+        value: redis
+      - key: SESSION_DRIVER
+        value: redis
+      - key: REDIS_CLIENT
+        value: phpredis
+      - key: REDIS_HOST
+        fromService:
+          type: redis
+          name: lavasys-redis
+          property: host
+      - key: REDIS_PORT
+        fromService:
+          type: redis
+          name: lavasys-redis
+          property: port
+
+  - type: redis
+    name: lavasys-redis
+    plan: starter
+    maxmemoryPolicy: allkeys-lru
+
+  - type: static_site
+    name: lavasys-frontend
+    rootDir: lavasys---sistema-de-faturação-de-lavandaria (2)
+    buildCommand: npm ci && npm run build
+    staticPublishPath: ./dist
+    pullRequestPreviewsEnabled: false
+    envVars:
+      - key: VITE_API_BASE_URL
+        sync: false

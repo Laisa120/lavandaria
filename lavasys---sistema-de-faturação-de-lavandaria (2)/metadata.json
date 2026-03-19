@@ -1,0 +1,5 @@
+{
+  "name": "LavaSys - Sistema de Faturação de Lavandaria",
+  "description": "Sistema completo de faturação e gestão para lavandarias, com dashboard, gestão de clientes e pedidos.",
+  "requestFramePermissions": []
+}
