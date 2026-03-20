@@ -1,8 +1,8 @@
 services:
   - type: web
-    name: lavasys-backend
-    env: docker
-    rootDir: backend
+    name: lavasys-frontend
+    env: static
+    rootDir: frontend
     dockerfilePath: ./Dockerfile.render
     plan: starter
     autoDeploy: true
@@ -51,10 +51,10 @@ services:
       - key: FRONTEND_URL
         sync: false
 
-  - type: worker
-    name: lavasys-queue
-    env: docker
-    rootDir: backend
+  - type: web
+    name: lavasys-frontend
+    env: static
+    rootDir: frontend
     dockerfilePath: ./Dockerfile.render
     plan: starter
     autoDeploy: true
@@ -88,21 +88,21 @@ services:
         value: phpredis
       - key: REDIS_HOST
         fromService:
-          type: redis
-          name: lavasys-redis
+          type: web
+          name: lavasys-frontend
           property: host
       - key: REDIS_PORT
         fromService:
-          type: redis
-          name: lavasys-redis
+          type: web
+          name: lavasys-frontend
           property: port
 
-  - type: redis
-    name: lavasys-redis
+  - type: web
+    name: lavasys-frontend
     plan: starter
     maxmemoryPolicy: allkeys-lru
 
-  - type: static_site
+  - type: web
     name: lavasys-frontend
     rootDir: frontend
     buildCommand: npm ci && npm run build
