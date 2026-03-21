@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import { 
   TrendingUp, 
   Users, 
@@ -7,17 +7,6 @@ import {
   ArrowUpRight,
   ArrowDownRight
 } from 'lucide-react';
-import { 
-  BarChart, 
-  Bar, 
-  XAxis, 
-  YAxis, 
-  CartesianGrid, 
-  Tooltip, 
-  ResponsiveContainer,
-  AreaChart,
-  Area
-} from 'recharts';
 import { Order, Customer } from '../types';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -28,26 +17,62 @@ interface DashboardProps {
   customers: Customer[];
 }
 
-const data = [
-  { name: 'Seg', total: 400 },
-  { name: 'Ter', total: 300 },
-  { name: 'Qua', total: 600 },
-  { name: 'Qui', total: 800 },
-  { name: 'Sex', total: 500 },
-  { name: 'Sáb', total: 900 },
-  { name: 'Dom', total: 200 },
-];
-
-const revenueData = [
-  { name: 'Jan', value: 4000 },
-  { name: 'Fev', value: 3000 },
-  { name: 'Mar', value: 5000 },
-  { name: 'Abr', value: 4500 },
-  { name: 'Mai', value: 6000 },
-  { name: 'Jun', value: 5500 },
-];
+const loadDashboardCharts = () => import('./DashboardCharts');
+const DashboardCharts = lazy(() => loadDashboardCharts().then((m) => ({ default: m.DashboardCharts })));
 
 export const Dashboard: React.FC<DashboardProps> = ({ orders, customers }) => {
+  const chartsRef = useRef<HTMLDivElement | null>(null);
+  const [shouldRenderCharts, setShouldRenderCharts] = useState(false);
+
+  useEffect(() => {
+    if (!chartsRef.current || shouldRenderCharts) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const entry = entries[0];
+        if (!entry?.isIntersecting) return;
+        setShouldRenderCharts(true);
+        observer.disconnect();
+      },
+      { root: null, rootMargin: '160px 0px', threshold: 0.1 },
+    );
+
+    observer.observe(chartsRef.current);
+    return () => observer.disconnect();
+  }, [shouldRenderCharts]);
+
+  useEffect(() => {
+    if (shouldRenderCharts) return;
+
+    let timeoutId: number | null = null;
+    const idleWindow = window as Window & {
+      requestIdleCallback?: (callback: IdleRequestCallback, opts?: IdleRequestOptions) => number;
+      cancelIdleCallback?: (handle: number) => void;
+    };
+
+    if (typeof idleWindow.requestIdleCallback === 'function') {
+      const idleId = idleWindow.requestIdleCallback(() => {
+        void loadDashboardCharts();
+      }, { timeout: 1800 });
+
+      return () => {
+        if (typeof idleWindow.cancelIdleCallback === 'function') {
+          idleWindow.cancelIdleCallback(idleId);
+        }
+      };
+    }
+
+    timeoutId = window.setTimeout(() => {
+      void loadDashboardCharts();
+    }, 1200);
+
+    return () => {
+      if (timeoutId !== null) {
+        window.clearTimeout(timeoutId);
+      }
+    };
+  }, [shouldRenderCharts]);
+
   const totalRevenue = orders.reduce((acc, order) => acc + order.total, 0);
   const pendingOrders = orders.filter(o => o.status === 'pending' || o.status === 'processing').length;
 
@@ -91,7 +116,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ orders, customers }) => {
       {/* Stats Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
         {stats.map((stat, i) => (
-          <div key={i} className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-shadow">
+          <div key={i} className="card-modern p-6">
             <div className="flex justify-between items-start mb-4">
               <div className={`p-3 rounded-xl ${stat.color}`}>
                 <stat.icon className="w-6 h-6" />
@@ -110,65 +135,28 @@ export const Dashboard: React.FC<DashboardProps> = ({ orders, customers }) => {
       </div>
 
       {/* Charts Section */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
-          <div className="flex items-center justify-between mb-6">
-            <h3 className="font-bold text-slate-800">Pedidos por Dia</h3>
-            <select className="text-sm border-none bg-slate-50 rounded-lg px-3 py-1 text-slate-600 outline-none">
-              <option>Esta Semana</option>
-              <option>Semana Passada</option>
-            </select>
-          </div>
-          <div className="h-80">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={data}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#64748b', fontSize: 12 }} dy={10} />
-                <YAxis axisLine={false} tickLine={false} tick={{ fill: '#64748b', fontSize: 12 }} />
-                <Tooltip 
-                  cursor={{ fill: '#f8fafc' }}
-                  contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
-                />
-                <Bar dataKey="total" fill="#3b82f6" radius={[6, 6, 0, 0]} barSize={40} />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-
-        <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
-          <div className="flex items-center justify-between mb-6">
-            <h3 className="font-bold text-slate-800">Crescimento de Receita</h3>
-            <div className="flex gap-2">
-              <div className="flex items-center gap-1.5">
-                <div className="w-3 h-3 rounded-full bg-blue-500" />
-                <span className="text-xs text-slate-500">Este Ano</span>
+      <div ref={chartsRef}>
+        {shouldRenderCharts ? (
+          <Suspense
+            fallback={
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                <div className="card-modern p-6 h-96 animate-pulse bg-slate-50" />
+                <div className="card-modern p-6 h-96 animate-pulse bg-slate-50" />
               </div>
-            </div>
+            }
+          >
+            <DashboardCharts />
+          </Suspense>
+        ) : (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            <div className="card-modern p-6 h-96 animate-pulse bg-slate-50" />
+            <div className="card-modern p-6 h-96 animate-pulse bg-slate-50" />
           </div>
-          <div className="h-80">
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={revenueData}>
-                <defs>
-                  <linearGradient id="colorValue" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.1}/>
-                    <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#64748b', fontSize: 12 }} dy={10} />
-                <YAxis axisLine={false} tickLine={false} tick={{ fill: '#64748b', fontSize: 12 }} />
-                <Tooltip 
-                  contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
-                />
-                <Area type="monotone" dataKey="value" stroke="#3b82f6" strokeWidth={3} fillOpacity={1} fill="url(#colorValue)" />
-              </AreaChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
+        )}
       </div>
 
       {/* Recent Orders Table */}
-      <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+      <div className="card-modern overflow-hidden">
         <div className="p-6 border-b border-slate-100 flex items-center justify-between">
           <h3 className="font-bold text-slate-800">Pedidos Recentes</h3>
           <button className="text-sm font-medium text-blue-600 hover:text-blue-700">Ver todos</button>

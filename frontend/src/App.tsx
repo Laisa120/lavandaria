@@ -1,17 +1,4 @@
-import { useEffect, useState } from 'react';
-import { Layout } from './components/Layout';
-import { Dashboard } from './components/Dashboard';
-import { Orders } from './components/Orders';
-import { Customers } from './components/Customers';
-import { Services } from './components/Services';
-import { Cashiers } from './components/Cashiers';
-import { Reports } from './components/Reports';
-import { Settings } from './components/Settings';
-import { Invoicing } from './components/Invoicing';
-import { Banner } from './components/Banner';
-import { Login } from './components/Login';
-import { LandingPage } from './components/LandingPage';
-import { SupportTechnical } from './components/support/SupportTechnical';
+import { lazy, Suspense, useEffect, useState } from 'react';
 import { Customer, LaundryItem, LaundrySettings, Order, User } from './types';
 import { checkLicense } from './lib/supportGenomnApi';
 import {
@@ -33,12 +20,31 @@ import {
   updateService,
   updateUser,
 } from './lib/api';
+import { toUserErrorMessage } from './lib/userErrors';
+
+const Layout = lazy(() => import('./components/Layout').then((m) => ({ default: m.Layout })));
+const Dashboard = lazy(() => import('./components/Dashboard').then((m) => ({ default: m.Dashboard })));
+const Orders = lazy(() => import('./components/Orders').then((m) => ({ default: m.Orders })));
+const Customers = lazy(() => import('./components/Customers').then((m) => ({ default: m.Customers })));
+const Services = lazy(() => import('./components/Services').then((m) => ({ default: m.Services })));
+const Cashiers = lazy(() => import('./components/Cashiers').then((m) => ({ default: m.Cashiers })));
+const Reports = lazy(() => import('./components/Reports').then((m) => ({ default: m.Reports })));
+const Settings = lazy(() => import('./components/Settings').then((m) => ({ default: m.Settings })));
+const Invoicing = lazy(() => import('./components/Invoicing').then((m) => ({ default: m.Invoicing })));
+const Banner = lazy(() => import('./components/Banner').then((m) => ({ default: m.Banner })));
+const Login = lazy(() => import('./components/Login').then((m) => ({ default: m.Login })));
+const LandingPage = lazy(() => import('./components/LandingPage').then((m) => ({ default: m.LandingPage })));
+const SupportTechnical = lazy(() =>
+  import('./components/support/SupportTechnical').then((m) => ({ default: m.SupportTechnical })),
+);
+const AboutPage = lazy(() => import('./components/AboutPage').then((m) => ({ default: m.AboutPage })));
 
 const SESSION_KEY = 'lavasys_session_state';
 
 function createEmptySettings(): LaundrySettings {
   return {
     companyName: '',
+    landingBannerImage: '',
     tradeName: '',
     nif: '',
     companyType: 'Lda',
@@ -78,7 +84,12 @@ export default function App() {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [view, setView] = useState<'landing' | 'login' | 'system'>('landing');
   const [isBootstrapping, setIsBootstrapping] = useState(true);
+  const [startupError, setStartupError] = useState('');
   const [licenseBlockedMessage, setLicenseBlockedMessage] = useState('');
+  const [showWelcomeBanner, setShowWelcomeBanner] = useState(true);
+  const [publicRoute, setPublicRoute] = useState<'landing' | 'about'>(
+    window.location.pathname === '/about' ? 'about' : 'landing',
+  );
 
   const [orders, setOrders] = useState<Order[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
@@ -86,46 +97,58 @@ export default function App() {
   const [settings, setSettings] = useState<LaundrySettings>(createEmptySettings());
   const [users, setUsers] = useState<User[]>([]);
 
-  useEffect(() => {
-    const load = async () => {
-      try {
-        const payload = await getBootstrap();
-        setIsLaundryRegistered(payload.isRegistered);
-        setSettings(payload.settings ?? createEmptySettings());
-        setOrders(payload.orders);
-        setCustomers(payload.customers);
-        setLaundryItems(payload.services);
-        setUsers(payload.users);
+  const loadBootstrap = async () => {
+    setIsBootstrapping(true);
+    setStartupError('');
 
-        const savedSession = sessionStorage.getItem(SESSION_KEY);
-        if (savedSession) {
-          const parsed = JSON.parse(savedSession) as { userId?: string; activeTab?: string };
-          const currentUser = payload.users.find((u) => u.id === parsed.userId);
+    try {
+      const payload = await getBootstrap();
+      setIsLaundryRegistered(payload.isRegistered);
+      setSettings(payload.settings ?? createEmptySettings());
+      setOrders(payload.orders);
+      setCustomers(payload.customers);
+      setLaundryItems(payload.services);
+      setUsers(payload.users);
 
-          if (currentUser) {
-            try {
-              const license = await checkLicense(currentUser.id);
-              setLicenseBlockedMessage(license.valid ? '' : license.message);
-            } catch {
-              setLicenseBlockedMessage('');
-            }
+      const savedSession = sessionStorage.getItem(SESSION_KEY);
+      if (savedSession) {
+        const parsed = JSON.parse(savedSession) as { userId?: string; activeTab?: string; welcomeDismissed?: boolean };
+        const currentUser = payload.users.find((u) => u.id === parsed.userId);
 
-            setUser(currentUser);
-            setView('system');
-            setActiveTab(parsed.activeTab ?? (currentUser.role === 'admin' ? 'dashboard' : 'orders'));
-          } else {
-            sessionStorage.removeItem(SESSION_KEY);
+        if (currentUser) {
+          try {
+            const license = await checkLicense(currentUser.id);
+            setLicenseBlockedMessage(license.valid ? '' : license.message);
+          } catch {
+            setLicenseBlockedMessage('');
           }
+
+          setUser(currentUser);
+          setView('system');
+          setActiveTab(parsed.activeTab ?? (currentUser.role === 'admin' ? 'dashboard' : 'orders'));
+          setShowWelcomeBanner(!parsed.welcomeDismissed);
+        } else {
+          sessionStorage.removeItem(SESSION_KEY);
         }
-      } catch (error) {
-        const message = error instanceof Error ? error.message : 'Erro ao carregar dados iniciais';
-        alert(message);
-      } finally {
-        setIsBootstrapping(false);
       }
+    } catch (error) {
+      setStartupError(toUserErrorMessage(error, 'Não foi possível carregar os dados iniciais.'));
+    } finally {
+      setIsBootstrapping(false);
+    }
+  };
+
+  useEffect(() => {
+    loadBootstrap();
+  }, []);
+
+  useEffect(() => {
+    const handlePopState = () => {
+      setPublicRoute(window.location.pathname === '/about' ? 'about' : 'landing');
     };
 
-    load();
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
   }, []);
 
   const handleRegisterLaundry = async (newSettings: LaundrySettings) => {
@@ -135,8 +158,7 @@ export default function App() {
       setIsLaundryRegistered(true);
       setView('login');
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Falha ao registrar lavandaria.';
-      alert(message);
+      alert(toUserErrorMessage(error, 'Não foi possível registrar a lavandaria.'));
     }
   };
 
@@ -154,24 +176,31 @@ export default function App() {
       setView('system');
       const nextTab = loggedUser.role === 'admin' ? 'dashboard' : 'orders';
       setActiveTab(nextTab);
-      sessionStorage.setItem(SESSION_KEY, JSON.stringify({ userId: loggedUser.id, activeTab: nextTab }));
+      setShowWelcomeBanner(true);
+      sessionStorage.setItem(SESSION_KEY, JSON.stringify({ userId: loggedUser.id, activeTab: nextTab, welcomeDismissed: false }));
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Falha no login.';
-      alert(message);
+      alert(toUserErrorMessage(error, 'Não foi possível iniciar sessão.'));
     }
   };
 
   const handleLogout = () => {
     setUser(null);
     setView('landing');
+    setPublicRoute('landing');
+    if (window.location.pathname !== '/') {
+      window.history.pushState({}, '', '/');
+    }
     setLicenseBlockedMessage('');
     sessionStorage.removeItem(SESSION_KEY);
   };
 
   useEffect(() => {
     if (!user) return;
-    sessionStorage.setItem(SESSION_KEY, JSON.stringify({ userId: user.id, activeTab }));
-  }, [user, activeTab]);
+    sessionStorage.setItem(
+      SESSION_KEY,
+      JSON.stringify({ userId: user.id, activeTab, welcomeDismissed: !showWelcomeBanner }),
+    );
+  }, [user, activeTab, showWelcomeBanner]);
 
   const handleAddOrder = async (order: Order) => {
     if (!user) {
@@ -190,8 +219,7 @@ export default function App() {
       });
       setOrders((prev) => [created, ...prev]);
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Falha ao criar pedido.';
-      alert(message);
+      alert(toUserErrorMessage(error, 'Não foi possível criar o pedido.'));
     }
   };
 
@@ -200,8 +228,7 @@ export default function App() {
       const saved = await updateOrder(updatedOrder);
       setOrders((prev) => prev.map((order) => (order.id === saved.id ? saved : order)));
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Falha ao atualizar pedido.';
-      alert(message);
+      alert(toUserErrorMessage(error, 'Não foi possível atualizar o pedido.'));
     }
   };
 
@@ -210,8 +237,7 @@ export default function App() {
       const saved = await updateOrderStatus(orderId, status);
       setOrders((prev) => prev.map((order) => (order.id === saved.id ? saved : order)));
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Falha ao atualizar status do pedido.';
-      alert(message);
+      alert(toUserErrorMessage(error, 'Não foi possível atualizar o estado do pedido.'));
     }
   };
 
@@ -221,8 +247,7 @@ export default function App() {
         await deleteOrder(orderId);
         setOrders((prev) => prev.filter((order) => order.id !== orderId));
       } catch (error) {
-        const message = error instanceof Error ? error.message : 'Falha ao excluir pedido.';
-        alert(message);
+        alert(toUserErrorMessage(error, 'Não foi possível excluir o pedido.'));
       }
     }
   };
@@ -237,8 +262,7 @@ export default function App() {
       setCustomers((prev) => [created, ...prev]);
       return created;
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Falha ao cadastrar cliente.';
-      alert(message);
+      alert(toUserErrorMessage(error, 'Não foi possível cadastrar o cliente.'));
       throw error;
     }
   };
@@ -253,8 +277,7 @@ export default function App() {
       setCustomers((prev) => prev.map((customer) => (customer.id === saved.id ? saved : customer)));
       return saved;
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Falha ao atualizar cliente.';
-      alert(message);
+      alert(toUserErrorMessage(error, 'Não foi possível atualizar o cliente.'));
       throw error;
     }
   };
@@ -265,8 +288,7 @@ export default function App() {
         await deleteCustomer(customerId);
         setCustomers((prev) => prev.filter((customer) => customer.id !== customerId));
       } catch (error) {
-        const message = error instanceof Error ? error.message : 'Falha ao excluir cliente.';
-        alert(message);
+        alert(toUserErrorMessage(error, 'Não foi possível excluir o cliente.'));
       }
     }
   };
@@ -280,8 +302,7 @@ export default function App() {
       });
       setLaundryItems((prev) => [created, ...prev]);
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Falha ao criar serviço.';
-      alert(message);
+      alert(toUserErrorMessage(error, 'Não foi possível criar o serviço.'));
     }
   };
 
@@ -291,8 +312,7 @@ export default function App() {
         await deleteService(serviceId);
         setLaundryItems((prev) => prev.filter((service) => service.id !== serviceId));
       } catch (error) {
-        const message = error instanceof Error ? error.message : 'Falha ao excluir serviço.';
-        alert(message);
+        alert(toUserErrorMessage(error, 'Não foi possível excluir o serviço.'));
       }
     }
   };
@@ -306,8 +326,7 @@ export default function App() {
       });
       setLaundryItems((prev) => prev.map((item) => (item.id === saved.id ? saved : item)));
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Falha ao editar serviço.';
-      alert(message);
+      alert(toUserErrorMessage(error, 'Não foi possível editar o serviço.'));
     }
   };
 
@@ -322,8 +341,7 @@ export default function App() {
       });
       setUsers((prev) => [...prev, created]);
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Falha ao criar utilizador.';
-      alert(message);
+      alert(toUserErrorMessage(error, 'Não foi possível criar o utilizador.'));
     }
   };
 
@@ -338,8 +356,7 @@ export default function App() {
       });
       setUsers((prev) => prev.map((u) => (u.id === saved.id ? saved : u)));
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Falha ao atualizar utilizador.';
-      alert(message);
+      alert(toUserErrorMessage(error, 'Não foi possível atualizar o utilizador.'));
     }
   };
 
@@ -349,8 +366,7 @@ export default function App() {
         await deleteUser(userId);
         setUsers((prev) => prev.filter((u) => u.id !== userId));
       } catch (error) {
-        const message = error instanceof Error ? error.message : 'Falha ao excluir utilizador.';
-        alert(message);
+        alert(toUserErrorMessage(error, 'Não foi possível excluir o utilizador.'));
       }
     }
   };
@@ -359,18 +375,62 @@ export default function App() {
     return <div className="min-h-screen flex items-center justify-center text-slate-500">Carregando sistema...</div>;
   }
 
+  if (startupError) {
+    return (
+      <div className="min-h-screen bg-slate-100 flex items-center justify-center p-4">
+        <div className="max-w-lg w-full bg-white rounded-2xl border border-slate-200 p-6 shadow-sm">
+          <h2 className="text-2xl font-bold text-slate-800 mb-2">Não foi possível abrir o sistema</h2>
+          <p className="text-slate-600 mb-6">{startupError}</p>
+          <button
+            onClick={loadBootstrap}
+            className="w-full bg-slate-800 hover:bg-slate-900 text-white py-3 rounded-xl font-semibold"
+          >
+            Tentar novamente
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  const pageLoader = <div className="min-h-screen flex items-center justify-center text-slate-500">Carregando...</div>;
+
+  if (view === 'landing' && publicRoute === 'about') {
+    return (
+      <Suspense fallback={pageLoader}>
+        <AboutPage
+          settings={settings}
+          onBack={() => {
+            window.history.pushState({}, '', '/');
+            setPublicRoute('landing');
+          }}
+        />
+      </Suspense>
+    );
+  }
+
   if (view === 'landing') {
     return (
-      <LandingPage
-        isRegistered={isLaundryRegistered}
-        onRegister={handleRegisterLaundry}
-        onProceedToLogin={() => setView('login')}
-      />
+      <Suspense fallback={pageLoader}>
+        <LandingPage
+          isRegistered={isLaundryRegistered}
+          settings={settings}
+          onRegister={handleRegisterLaundry}
+          onProceedToLogin={() => setView('login')}
+          onOpenAbout={() => {
+            window.history.pushState({}, '', '/about');
+            setPublicRoute('about');
+          }}
+        />
+      </Suspense>
     );
   }
 
   if (view === 'login' || !user) {
-    return <Login onLogin={handleLogin} onBack={() => setView('landing')} />;
+    return (
+      <Suspense fallback={pageLoader}>
+        <Login onLogin={handleLogin} onBack={() => setView('landing')} />
+      </Suspense>
+    );
   }
 
   if (licenseBlockedMessage) {
@@ -395,7 +455,9 @@ export default function App() {
       case 'dashboard':
         return user.role === 'admin' ? (
           <>
-            <Banner />
+            {showWelcomeBanner && (
+              <Banner settings={settings} onClose={() => setShowWelcomeBanner(false)} />
+            )}
             <Dashboard orders={orders} customers={customers} />
           </>
         ) : null;
@@ -504,8 +566,10 @@ export default function App() {
   };
 
   return (
-    <Layout activeTab={activeTab} setActiveTab={setActiveTab} user={user} settings={settings} onLogout={handleLogout}>
-      {renderContent()}
-    </Layout>
+    <Suspense fallback={pageLoader}>
+      <Layout activeTab={activeTab} setActiveTab={setActiveTab} user={user} settings={settings} onLogout={handleLogout}>
+        {renderContent()}
+      </Layout>
+    </Suspense>
   );
 }

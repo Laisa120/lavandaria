@@ -19,7 +19,7 @@ export const Login: React.FC<LoginProps> = ({ onLogin, onBack }) => {
   const handleRoleSelect = (role: UserRole) => {
     setSelectedRole(role);
     setStep('credentials');
-    setEmail(role === 'admin' ? 'admin@lavasys.com' : 'caixa@lavasys.com');
+    setEmail(role === 'admin' ? 'admin@genomni.com' : 'caixa@genomni.com');
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -35,17 +35,17 @@ export const Login: React.FC<LoginProps> = ({ onLogin, onBack }) => {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-[linear-gradient(160deg,#f3faff_0%,#ffffff_55%,#eaf5ff_100%)] flex items-center justify-center p-4">
       <motion.div
         initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}
         className="max-w-md w-full"
       >
         <div className="text-center mb-8">
-          <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white shadow-xl shadow-blue-200 mx-auto mb-4">
+          <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-[#0e2a47] to-[#4ea9d9] flex items-center justify-center text-white shadow-xl shadow-[#0e2a4730] mx-auto mb-4">
             <Droplets className="w-10 h-10" />
           </div>
-          <h1 className="text-3xl font-bold text-slate-800">LavaSys</h1>
+          <h1 className="text-3xl font-bold text-[#0e2a47]">Sistema de Lavandaria GenOmni</h1>
           <p className="text-slate-500">
             {step === 'role' ? 'Selecione seu perfil de acesso' : `Acesso como ${selectedRole === 'admin' ? 'Administrador' : 'Gerente de Caixa'}`}
           </p>
@@ -62,33 +62,33 @@ export const Login: React.FC<LoginProps> = ({ onLogin, onBack }) => {
             >
               <button
                 onClick={() => handleRoleSelect('admin')}
-                className="w-full group relative bg-white p-6 rounded-3xl border border-slate-200 hover:border-blue-500 hover:shadow-xl hover:shadow-blue-100 transition-all text-left"
+                className="w-full group relative bg-white p-6 rounded-3xl border border-slate-200 hover:border-[#4ea9d9] hover:shadow-xl hover:shadow-[#4ea9d944] transition-all text-left"
               >
                 <div className="flex items-center gap-4">
-                  <div className="p-4 rounded-2xl bg-blue-50 text-blue-600 group-hover:bg-blue-600 group-hover:text-white transition-colors">
+                  <div className="p-4 rounded-2xl bg-[#dff2ff] text-[#0e2a47] group-hover:bg-[#0e2a47] group-hover:text-white transition-colors">
                     <ShieldCheck className="w-8 h-8" />
                   </div>
                   <div className="flex-1">
                     <h3 className="text-lg font-bold text-slate-800">Administrador</h3>
                     <p className="text-sm text-slate-500">Acesso total ao sistema e configurações</p>
                   </div>
-                  <ArrowRight className="w-5 h-5 text-slate-300 group-hover:text-blue-500 transition-colors" />
+                  <ArrowRight className="w-5 h-5 text-slate-300 group-hover:text-[#0e2a47] transition-colors" />
                 </div>
               </button>
 
               <button
                 onClick={() => handleRoleSelect('cashier')}
-                className="w-full group relative bg-white p-6 rounded-3xl border border-slate-200 hover:border-purple-500 hover:shadow-xl hover:shadow-purple-100 transition-all text-left"
+                className="w-full group relative bg-white p-6 rounded-3xl border border-slate-200 hover:border-[#4ea9d9] hover:shadow-xl hover:shadow-[#4ea9d944] transition-all text-left"
               >
                 <div className="flex items-center gap-4">
-                  <div className="p-4 rounded-2xl bg-purple-50 text-purple-600 group-hover:bg-purple-600 group-hover:text-white transition-colors">
+                  <div className="p-4 rounded-2xl bg-[#dff2ff] text-[#0e2a47] group-hover:bg-[#4ea9d9] group-hover:text-[#0e2a47] transition-colors">
                     <Wallet className="w-8 h-8" />
                   </div>
                   <div className="flex-1">
                     <h3 className="text-lg font-bold text-slate-800">Gerente de Caixa</h3>
                     <p className="text-sm text-slate-500">Gestão de pedidos e clientes</p>
                   </div>
-                  <ArrowRight className="w-5 h-5 text-slate-300 group-hover:text-purple-500 transition-colors" />
+                  <ArrowRight className="w-5 h-5 text-slate-300 group-hover:text-[#0e2a47] transition-colors" />
                 </div>
               </button>
 
@@ -108,7 +108,7 @@ export const Login: React.FC<LoginProps> = ({ onLogin, onBack }) => {
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: -20 }}
             >
-              <form onSubmit={handleSubmit} className="bg-white p-8 rounded-3xl border border-slate-200 shadow-sm space-y-6">
+              <form onSubmit={handleSubmit} className="bg-white p-8 rounded-3xl border border-slate-200 shadow-xl shadow-[#0e2a4714] space-y-6">
                 <div className="space-y-4">
                   <div className="space-y-2">
                     <label className="text-sm font-semibold text-slate-700">E-mail</label>
@@ -119,7 +119,7 @@ export const Login: React.FC<LoginProps> = ({ onLogin, onBack }) => {
                         type="email"
                         value={email}
                         onChange={(e) => setEmail(e.target.value)}
-                        className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                        className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#4ea9d944]"
                         placeholder="seu@email.com"
                       />
                     </div>
@@ -134,7 +134,7 @@ export const Login: React.FC<LoginProps> = ({ onLogin, onBack }) => {
                         type={showPassword ? 'text' : 'password'}
                         value={password}
                         onChange={(e) => setPassword(e.target.value)}
-                        className="w-full pl-10 pr-12 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                        className="w-full pl-10 pr-12 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#4ea9d944]"
                         placeholder="••••••••"
                       />
                       <button
@@ -153,7 +153,7 @@ export const Login: React.FC<LoginProps> = ({ onLogin, onBack }) => {
                   <button
                     type="submit"
                     disabled={isLoading}
-                    className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 text-white py-4 rounded-xl font-bold transition-all shadow-lg shadow-blue-100 flex items-center justify-center gap-2"
+                    className="w-full bg-[#0e2a47] hover:bg-[#12345a] disabled:bg-slate-300 text-white py-4 rounded-xl font-semibold transition-all shadow-lg shadow-[#0e2a4730] flex items-center justify-center gap-2"
                   >
                     {isLoading ? (
                       <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
@@ -176,7 +176,7 @@ export const Login: React.FC<LoginProps> = ({ onLogin, onBack }) => {
         </AnimatePresence>
 
         <p className="mt-8 text-center text-xs text-slate-400">
-          LavaSys v1.0.0 &copy; 2024 - Sistema de Gestão de Lavandaria
+          GenOmni v1.0.0 &copy; 2026 - Sistema de Gestão de Lavandaria
         </p>
       </motion.div>
     </div>

@@ -1,4 +1,9 @@
-# Deploy Produção (Servidor Real + Render)
+# Deploy Produção SaaS (app/api/admin)
+
+Arquitetura alvo:
+- Cliente: `https://app.genomni.com`
+- API: `https://api.genomni.com`
+- Admin (oculto): `https://admin.genomni.com`
 
 ## 1) Servidor Real (Docker) - comando único
 
@@ -20,8 +25,8 @@
    ./deploy/subir_prod.sh
    ```
 3. Valide:
-   - `http://SEU_IP_OU_DOMINIO/up`
-   - `http://SEU_IP_OU_DOMINIO/api/bootstrap`
+   - `https://api.genomni.com/up`
+   - `https://api.genomni.com/api/bootstrap`
 
 ### Comandos úteis
 - Parar sem apagar dados:
@@ -37,6 +42,7 @@
 - Não use `down -v` em produção, salvo reset intencional.
 - O script de produção executa apenas `migrate --force` (não roda `seed` automático).
 - Para HTTPS em servidor próprio, coloque um proxy reverso com TLS (Nginx/Caddy/Traefik) na frente da API.
+- Configure CORS para `app.genomni.com` e `admin.genomni.com`.
 
 ## 2) Render (Blueprint)
 
@@ -46,22 +52,54 @@ Arquivo: `render.yaml`
 1. No Render, clique em **New + Blueprint**.
 2. Selecione este repositório.
 3. Preencha variáveis `sync: false`:
-   - Backend: `APP_URL`, `DB_HOST`, `DB_DATABASE`, `DB_USERNAME`, `DB_PASSWORD`, `FRONTEND_URL`
-   - Frontend: `VITE_API_BASE_URL` = URL do backend + `/api`
+   - Backend:
+     - `APP_URL=https://api.genomni.com`
+     - `FRONTEND_URL=https://app.genomni.com`
+     - `APP_FRONTEND_URL=https://app.genomni.com`
+     - `ADMIN_FRONTEND_URL=https://admin.genomni.com`
+     - `FRONTEND_URLS=https://app.genomni.com,https://admin.genomni.com`
+     - `DB_HOST`, `DB_DATABASE`, `DB_USERNAME`, `DB_PASSWORD`
+   - Frontend Cliente:
+     - `VITE_API_BASE_URL=https://api.genomni.com/api`
+   - Frontend Admin:
+     - `VITE_API_BASE_URL=https://api.genomni.com/api`
 4. Faça o deploy.
 
 ### Serviços criados
 - `lavasys-backend` (web)
 - `lavasys-queue` (worker)
 - `lavasys-redis`
-- `lavasys-frontend` (static site)
+- `genomni-app` (static site)
+- `genomni-admin` (static site)
 
-## 3) Checklist Go-live
+## 3) Vercel (alternativa para frontend)
+
+Se optar por Vercel, crie dois projetos apontando para `frontend/`:
+
+1. Projeto `genomni-app`
+   - Domínio: `app.genomni.com`
+   - Env:
+     - `VITE_API_BASE_URL=https://api.genomni.com/api`
+     - `VITE_APP_HOST=app.genomni.com`
+     - `VITE_ADMIN_HOST=admin.genomni.com`
+     - `VITE_FORCE_CONTEXT=app`
+
+2. Projeto `genomni-admin`
+   - Domínio: `admin.genomni.com`
+   - Env:
+     - `VITE_API_BASE_URL=https://api.genomni.com/api`
+     - `VITE_APP_HOST=app.genomni.com`
+     - `VITE_ADMIN_HOST=admin.genomni.com`
+     - `VITE_FORCE_CONTEXT=admin`
+
+## 4) Checklist Go-live
 - [ ] `APP_ENV=production`
 - [ ] `APP_DEBUG=false`
 - [ ] `APP_KEY` definido
-- [ ] CORS com `FRONTEND_URL` correto
+- [ ] CORS com `FRONTEND_URLS` correto (`app` + `admin`)
 - [ ] Banco com backup e restore testados
 - [ ] Healthcheck `/up` funcionando
 - [ ] Queue worker online
 - [ ] Logs/alertas configurados
+- [ ] `app.genomni.com` sem exposição de admin no menu
+- [ ] `admin.genomni.com` acessível apenas por URL direta

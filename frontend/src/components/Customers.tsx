@@ -7,6 +7,7 @@ import {
   Trash2, 
   Edit2,
   UserPlus,
+  User as UserIcon,
   Users,
   History,
   Receipt,
@@ -18,9 +19,8 @@ import { Customer, Order, LaundryItem } from '../types';
 import { STATUS_COLORS, STATUS_LABELS } from '../constants';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import jsPDF from 'jspdf';
-import 'jspdf-autotable';
 import { formatCurrencyAO } from '../lib/format';
+import { loadPdfWithAutoTable } from '../lib/pdf';
 
 interface CustomersProps {
   customers: Customer[];
@@ -104,31 +104,36 @@ export const Customers: React.FC<CustomersProps> = ({
     }
   };
 
-  const handleExportPDF = () => {
-    const doc = new jsPDF();
-    
-    doc.setFontSize(18);
-    doc.text('Base de Clientes - Lavandaria', 14, 22);
-    doc.setFontSize(11);
-    doc.setTextColor(100);
-    doc.text(`Gerado em: ${format(new Date(), 'dd/MM/yyyy HH:mm')}`, 14, 30);
+  const handleExportPDF = async () => {
+    try {
+      const { jsPDF, autoTable } = await loadPdfWithAutoTable();
+      const doc = new jsPDF();
 
-    const tableData = filteredCustomers.map(c => [
-      c.name,
-      c.phone,
-      c.address,
-      format(new Date(c.createdAt), 'dd/MM/yyyy')
-    ]);
+      doc.setFontSize(18);
+      doc.text('Base de Clientes - Lavandaria', 14, 22);
+      doc.setFontSize(11);
+      doc.setTextColor(100);
+      doc.text(`Gerado em: ${format(new Date(), 'dd/MM/yyyy HH:mm')}`, 14, 30);
 
-    (doc as any).autoTable({
-      startY: 40,
-      head: [['Nome', 'Telefone', 'Endereço', 'Desde']],
-      body: tableData,
-      theme: 'striped',
-      headStyles: { fillColor: [37, 99, 235] },
-    });
+      const tableData = filteredCustomers.map(c => [
+        c.name,
+        c.phone,
+        c.address,
+        format(new Date(c.createdAt), 'dd/MM/yyyy')
+      ]);
 
-    doc.save(`clientes-${format(new Date(), 'yyyy-MM-dd')}.pdf`);
+      autoTable(doc, {
+        startY: 40,
+        head: [['Nome', 'Telefone', 'Endereço', 'Desde']],
+        body: tableData,
+        theme: 'striped',
+        headStyles: { fillColor: [37, 99, 235] },
+      });
+
+      doc.save(`clientes-${format(new Date(), 'yyyy-MM-dd')}.pdf`);
+    } catch (error) {
+      alert(error instanceof Error ? error.message : 'Falha ao exportar PDF.');
+    }
   };
 
   return (
@@ -292,6 +297,10 @@ export const Customers: React.FC<CustomersProps> = ({
                           <div className="flex items-center gap-1 text-[10px] font-bold text-slate-400 uppercase">
                             <Clock className="w-3 h-3" />
                             Entrega: {format(new Date(order.expectedDelivery), 'dd/MM/yy')}
+                          </div>
+                          <div className="flex items-center gap-1 text-[10px] font-bold text-slate-500 uppercase">
+                            <UserIcon className="w-3 h-3" />
+                            {order.createdByUserRole === 'cashier' ? 'Caixa' : 'Operador'}: {order.createdByUserName || 'Sistema'}
                           </div>
                           <div className={`flex items-center gap-1 text-[10px] font-bold uppercase ${order.paymentStatus === 'paid' ? 'text-green-600' : 'text-amber-600'}`}>
                             {order.paymentStatus === 'paid' ? <CheckCircle2 className="w-3 h-3" /> : <AlertCircle className="w-3 h-3" />}

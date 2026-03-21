@@ -11,6 +11,11 @@ class Empresa extends Model
 
     protected $fillable = [
         'logo',
+        'landing_banner_image',
+        'about_story',
+        'about_mission',
+        'about_vision',
+        'about_team_json',
         'nome',
         'nome_comercial',
         'nif',
@@ -51,5 +56,6 @@ class Empresa extends Model
         'permitir_desconto_global' => 'boolean',
         'impressao_automatica' => 'boolean',
         'download_pdf_automatico' => 'boolean',
+        'about_team_json' => 'array',
     ];
 }

@@ -47,6 +47,12 @@ services:
           property: port
       - key: FRONTEND_URL
         sync: false
+      - key: APP_FRONTEND_URL
+        sync: false
+      - key: ADMIN_FRONTEND_URL
+        sync: false
+      - key: FRONTEND_URLS
+        sync: false
 
   # WORKER (SEM startCommand ❗)
   - type: worker
@@ -101,9 +107,9 @@ services:
     ipAllowList: []   # 🔥 permite acesso interno
     maxmemoryPolicy: allkeys-lru
 
-  # FRONTEND
+  # FRONTEND CLIENTE (app.genomni.com)
   - type: web
-    name: lavasys-frontend
+    name: genomni-app
     env: static
     rootDir: frontend
     buildCommand: npm ci && npm run build
@@ -112,3 +118,27 @@ services:
     envVars:
       - key: VITE_API_BASE_URL
         sync: false
+      - key: VITE_APP_HOST
+        value: app.genomni.com
+      - key: VITE_ADMIN_HOST
+        value: admin.genomni.com
+      - key: VITE_FORCE_CONTEXT
+        value: app
+
+  # FRONTEND ADMIN (admin.genomni.com)
+  - type: web
+    name: genomni-admin
+    env: static
+    rootDir: frontend
+    buildCommand: npm ci && npm run build
+    staticPublishPath: dist
+    autoDeploy: true
+    envVars:
+      - key: VITE_API_BASE_URL
+        sync: false
+      - key: VITE_APP_HOST
+        value: app.genomni.com
+      - key: VITE_ADMIN_HOST
+        value: admin.genomni.com
+      - key: VITE_FORCE_CONTEXT
+        value: admin

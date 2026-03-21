@@ -17,13 +17,13 @@ export const Select = React.forwardRef<HTMLSelectElement, SelectProps>(
     return (
       <div className="space-y-1.5 w-full">
         {label && (
-          <label className="text-xs font-black text-slate-500 uppercase tracking-widest ml-1">
+          <label className="text-xs font-semibold text-slate-500 uppercase tracking-wide ml-1">
             {label}
           </label>
         )}
         <select
           className={cn(
-            "w-full bg-white border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-medium text-slate-700 outline-none transition-all focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 appearance-none cursor-pointer disabled:bg-slate-50 disabled:text-slate-400",
+            "w-full bg-white border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-medium text-slate-700 outline-none transition-all focus:ring-4 focus:ring-[#4ea9d92f] focus:border-[#4ea9d9] appearance-none cursor-pointer disabled:bg-slate-50 disabled:text-slate-400",
             error && "border-red-500 focus:ring-red-500/10 focus:border-red-500",
             className
           )}

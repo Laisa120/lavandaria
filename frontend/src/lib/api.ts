@@ -1,4 +1,5 @@
 import { Customer, LaundryItem, LaundrySettings, Order, OrderStatus, User, UserRole } from '../types';
+import { InstitutionalSettings } from '../types';
 
 type BootstrapPayload = {
   isRegistered: boolean;
@@ -10,9 +11,32 @@ type BootstrapPayload = {
 };
 
 const API_BASE = (import.meta.env.VITE_API_BASE_URL ?? '/api').replace(/\/$/, '');
+const LOCAL_API_FALLBACK = 'http://127.0.0.1:8000/api';
+const LOCAL_API_FALLBACK_ALT = 'http://localhost:8000/api';
 
-async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(`${API_BASE}${path}`, {
+class ApiRequestError extends Error {
+  constructor(message: string, public readonly status: number) {
+    super(message);
+    this.name = 'ApiRequestError';
+  }
+}
+
+function shouldUseLocalFallback(status: number): boolean {
+  if (status !== 404) return false;
+  if (typeof window === 'undefined') return false;
+  if (!API_BASE.startsWith('/')) return false;
+  return window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+}
+
+function shouldUseLocalFallbackForNetworkError(error: unknown): boolean {
+  if (typeof window === 'undefined') return false;
+  if (!API_BASE.startsWith('/')) return false;
+  if (!(window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')) return false;
+  return error instanceof TypeError;
+}
+
+async function doRequest<T>(base: string, path: string, init?: RequestInit): Promise<T> {
+  const response = await fetch(`${base}${path}`, {
     ...init,
     headers: {
       'Content-Type': 'application/json',
@@ -21,18 +45,61 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   });
 
   const text = await response.text();
-  const data = text ? JSON.parse(text) : null;
+  let data: unknown = null;
+  if (text) {
+    try {
+      data = JSON.parse(text);
+    } catch {
+      data = { message: text };
+    }
+  }
 
   if (!response.ok) {
-    const message = data?.message ?? `Erro na requisição (${response.status})`;
-    throw new Error(message);
+    const message =
+      typeof data === 'object' && data !== null && 'message' in data && typeof (data as { message?: unknown }).message === 'string'
+        ? (data as { message: string }).message
+        : `Erro na requisição (${response.status})`;
+    throw new ApiRequestError(message, response.status);
   }
 
   return data as T;
 }
 
+async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  try {
+    return await doRequest<T>(API_BASE, path, init);
+  } catch (error) {
+    if (shouldUseLocalFallbackForNetworkError(error)) {
+      try {
+        return await doRequest<T>(LOCAL_API_FALLBACK, path, init);
+      } catch {
+        return doRequest<T>(LOCAL_API_FALLBACK_ALT, path, init);
+      }
+    }
+    if (error instanceof ApiRequestError && shouldUseLocalFallback(error.status)) {
+      try {
+        return await doRequest<T>(LOCAL_API_FALLBACK, path, init);
+      } catch {
+        return doRequest<T>(LOCAL_API_FALLBACK_ALT, path, init);
+      }
+    }
+    if (error instanceof ApiRequestError && error.status >= 500) {
+      await new Promise((resolve) => setTimeout(resolve, 250));
+      return doRequest<T>(API_BASE, path, init);
+    }
+    throw error;
+  }
+}
+
 export function getBootstrap() {
-  return request<BootstrapPayload>('/bootstrap');
+  return request<BootstrapPayload>('/bootstrap').catch(async (firstError) => {
+    await new Promise((resolve) => setTimeout(resolve, 400));
+    try {
+      return await request<BootstrapPayload>('/bootstrap');
+    } catch {
+      throw firstError;
+    }
+  });
 }
 
 export function registerSettings(settings: LaundrySettings) {
@@ -46,6 +113,13 @@ export function updateSettings(settings: LaundrySettings) {
   return request<LaundrySettings>('/settings', {
     method: 'PUT',
     body: JSON.stringify(settings),
+  });
+}
+
+export function updateInstitutionalSettings(payload: InstitutionalSettings) {
+  return request<LaundrySettings>('/settings/institutional', {
+    method: 'PUT',
+    body: JSON.stringify(payload),
   });
 }
 

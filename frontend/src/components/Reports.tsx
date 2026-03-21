@@ -10,9 +10,8 @@ import {
 import { format, startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfYear, endOfYear, isWithinInterval, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { Order, Customer, LaundryItem, UserRole } from '../types';
-import jsPDF from 'jspdf';
-import autoTable from 'jspdf-autotable';
 import { formatCurrencyAO } from '../lib/format';
+import { loadPdfWithAutoTable } from '../lib/pdf';
 
 interface ReportsProps {
   orders: Order[];
@@ -23,47 +22,70 @@ interface ReportsProps {
 }
 
 type ReportType = 'daily' | 'weekly' | 'monthly' | 'yearly';
+type OperatorOption = { id: string; name: string; role: UserRole | null };
 
 export const Reports: React.FC<ReportsProps> = ({ orders, customers, laundryItems, userRole, currentUserId }) => {
   const [reportType, setReportType] = useState<ReportType>('daily');
+  const [operatorFilter, setOperatorFilter] = useState<string>('all');
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
   const isCashier = userRole === 'cashier';
+  const hasCustomRange = !!startDate && !!endDate;
+  const isDateRangeInvalid = hasCustomRange && new Date(startDate).getTime() > new Date(endDate).getTime();
   const getSellerRoleLabel = (role?: UserRole | null) => {
     if (role === 'admin') return 'ADMIN';
     if (role === 'cashier') return 'CAIXA';
     return 'SISTEMA';
   };
 
-  const getFilteredOrders = (type: ReportType) => {
-    const now = new Date();
-    let start: Date;
-    let end: Date;
+  const operatorOptions: OperatorOption[] = Array.from(
+    new Map(
+      orders
+        .filter((order) => order.createdByUserId && order.createdByUserName)
+        .map((order) => [
+          order.createdByUserId as string,
+          {
+            id: order.createdByUserId as string,
+            name: order.createdByUserName as string,
+            role: order.createdByUserRole ?? null,
+          },
+        ]),
+    ).values() as Iterable<OperatorOption>,
+  ).sort((a, b) => a.name.localeCompare(b.name));
 
-    switch (type) {
-      case 'daily':
-        start = startOfDay(now);
-        end = endOfDay(now);
-        break;
-      case 'weekly':
-        start = startOfWeek(now, { weekStartsOn: 1 });
-        end = endOfWeek(now, { weekStartsOn: 1 });
-        break;
-      case 'monthly':
-        start = startOfMonth(now);
-        end = endOfMonth(now);
-        break;
-      case 'yearly':
-        start = startOfYear(now);
-        end = endOfYear(now);
-        break;
-    }
+  const getFilteredOrders = (type: ReportType) => {
+    if (isDateRangeInvalid) return [];
+
+    const now = new Date();
+    const start = hasCustomRange
+      ? startOfDay(new Date(`${startDate}T00:00:00`))
+      : type === 'daily'
+        ? startOfDay(now)
+        : type === 'weekly'
+          ? startOfWeek(now, { weekStartsOn: 1 })
+          : type === 'monthly'
+            ? startOfMonth(now)
+            : startOfYear(now);
+    const end = hasCustomRange
+      ? endOfDay(new Date(`${endDate}T23:59:59`))
+      : type === 'daily'
+        ? endOfDay(now)
+        : type === 'weekly'
+          ? endOfWeek(now, { weekStartsOn: 1 })
+          : type === 'monthly'
+            ? endOfMonth(now)
+            : endOfYear(now);
 
     return orders.filter(order => {
       const orderDate = parseISO(order.createdAt);
       const inPeriod = isWithinInterval(orderDate, { start, end });
 
       if (!inPeriod) return false;
-      if (!isCashier) return true;
+      if (!isCashier) {
+        if (operatorFilter === 'all') return true;
+        return order.createdByUserId === operatorFilter;
+      }
 
       return order.createdByUserId === currentUserId && order.createdByUserRole === 'cashier';
     });
@@ -71,71 +93,73 @@ export const Reports: React.FC<ReportsProps> = ({ orders, customers, laundryItem
 
   const generatePDF = async (type: ReportType) => {
     setIsGenerating(true);
-    const filteredOrders = getFilteredOrders(type);
-    const totalRevenue = filteredOrders.reduce((acc, order) => acc + order.total, 0);
-    const totalOrders = filteredOrders.length;
-    const paidOrders = filteredOrders.filter(o => o.paymentStatus === 'paid').length;
-    
-    const doc = new jsPDF();
-    const title = `Relatório ${type === 'daily' ? 'Diário' : type === 'weekly' ? 'Semanal' : type === 'monthly' ? 'Mensal' : 'Anual'}`;
-    const dateStr = format(new Date(), "dd/MM/yyyy HH:mm");
+    try {
+      const { jsPDF, autoTable } = await loadPdfWithAutoTable();
+      const filteredOrders = getFilteredOrders(type);
+      const totalRevenue = filteredOrders.reduce((acc, order) => acc + order.total, 0);
+      const totalOrders = filteredOrders.length;
+      const paidOrders = filteredOrders.filter(o => o.paymentStatus === 'paid').length;
 
-    // Header
-    doc.setFontSize(20);
-    doc.setTextColor(30, 41, 59); // slate-800
-    doc.text('LavaSys - Sistema de Lavandaria', 14, 22);
-    
-    doc.setFontSize(14);
-    doc.setTextColor(71, 85, 105); // slate-600
-    doc.text(title, 14, 32);
-    
-    doc.setFontSize(10);
-    doc.text(`Gerado em: ${dateStr}`, 14, 40);
+      const doc = new jsPDF();
+      const title = hasCustomRange
+        ? `Relatório de ${format(new Date(`${startDate}T00:00:00`), 'dd/MM/yyyy')} até ${format(new Date(`${endDate}T00:00:00`), 'dd/MM/yyyy')}`
+        : `Relatório ${type === 'daily' ? 'Diário' : type === 'weekly' ? 'Semanal' : type === 'monthly' ? 'Mensal' : 'Anual'}`;
+      const dateStr = format(new Date(), "dd/MM/yyyy HH:mm");
 
-    // Summary Box
-    doc.setDrawColor(226, 232, 240); // slate-200
-    doc.setFillColor(248, 250, 252); // slate-50
-    doc.roundedRect(14, 48, 182, 30, 3, 3, 'FD');
-    
-    doc.setFontSize(11);
-    doc.setTextColor(30, 41, 59);
-    doc.text(`Total de Pedidos: ${totalOrders}`, 20, 58);
-    doc.text(`Pedidos Pagos: ${paidOrders}`, 20, 66);
-    doc.text(`Receita Total: ${formatCurrencyAO(totalRevenue)}`, 120, 58);
+      doc.setFontSize(20);
+      doc.setTextColor(30, 41, 59);
+      doc.text('Sistema de Lavandaria GenOmni', 14, 22);
+      doc.setFontSize(14);
+      doc.setTextColor(71, 85, 105);
+      doc.text(title, 14, 32);
+      doc.setFontSize(10);
+      doc.text(`Gerado em: ${dateStr}`, 14, 40);
 
-    // Table
-    const tableData = filteredOrders.map(order => {
-      const customer = customers.find(c => c.id === order.customerId);
-      const baseRow = [
-        order.id,
-        customer?.name || 'N/A',
-        format(parseISO(order.createdAt), 'dd/MM/yyyy HH:mm'),
-        order.status.toUpperCase(),
-        order.paymentStatus === 'paid' ? 'PAGO' : 'PENDENTE',
-      ];
+      doc.setDrawColor(226, 232, 240);
+      doc.setFillColor(248, 250, 252);
+      doc.roundedRect(14, 48, 182, 30, 3, 3, 'FD');
+      doc.setFontSize(11);
+      doc.setTextColor(30, 41, 59);
+      doc.text(`Total de Pedidos: ${totalOrders}`, 20, 58);
+      doc.text(`Pedidos Pagos: ${paidOrders}`, 20, 66);
+      doc.text(`Receita Total: ${formatCurrencyAO(totalRevenue)}`, 120, 58);
 
-      if (!isCashier) {
-        baseRow.push(order.createdByUserName || 'Sistema');
-        baseRow.push(getSellerRoleLabel(order.createdByUserRole));
-      }
+      const tableData = filteredOrders.map(order => {
+        const customer = customers.find(c => c.id === order.customerId);
+        const baseRow = [
+          order.id,
+          customer?.name || 'N/A',
+          format(parseISO(order.createdAt), 'dd/MM/yyyy HH:mm'),
+          order.status.toUpperCase(),
+          order.paymentStatus === 'paid' ? 'PAGO' : 'PENDENTE',
+        ];
 
-      baseRow.push(formatCurrencyAO(order.total));
-      return baseRow;
-    });
+        if (!isCashier) {
+          baseRow.push(order.createdByUserName || 'Sistema');
+          baseRow.push(getSellerRoleLabel(order.createdByUserRole));
+        }
 
-    autoTable(doc, {
-      startY: 85,
-      head: [isCashier
-        ? ['ID', 'Cliente', 'Data', 'Status', 'Pagamento', 'Total']
-        : ['ID', 'Cliente', 'Data', 'Status', 'Pagamento', 'Vendedor', 'Perfil', 'Total']],
-      body: tableData,
-      theme: 'striped',
-      headStyles: { fillColor: [37, 99, 235] }, // blue-600
-      styles: { fontSize: 9 },
-    });
+        baseRow.push(formatCurrencyAO(order.total));
+        return baseRow;
+      });
 
-    doc.save(`relatorio_${type}_${format(new Date(), 'yyyyMMdd')}.pdf`);
-    setIsGenerating(false);
+      autoTable(doc, {
+        startY: 85,
+        head: [isCashier
+          ? ['ID', 'Cliente', 'Data', 'Status', 'Pagamento', 'Total']
+          : ['ID', 'Cliente', 'Data', 'Status', 'Pagamento', 'Vendedor', 'Perfil', 'Total']],
+        body: tableData,
+        theme: 'striped',
+        headStyles: { fillColor: [37, 99, 235] },
+        styles: { fontSize: 9 },
+      });
+
+      doc.save(`relatorio_${type}_${format(new Date(), 'yyyyMMdd')}.pdf`);
+    } catch (error) {
+      alert(error instanceof Error ? error.message : 'Falha ao gerar relatório PDF.');
+    } finally {
+      setIsGenerating(false);
+    }
   };
 
   const currentType = isCashier ? 'daily' : reportType;
@@ -157,26 +181,88 @@ export const Reports: React.FC<ReportsProps> = ({ orders, customers, laundryItem
 
       {/* Report Type Selector */}
       {!isCashier && (
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          {[
-            { id: 'daily', label: 'Diário', icon: Calendar },
-            { id: 'weekly', label: 'Semanal', icon: TrendingUp },
-            { id: 'monthly', label: 'Mensal', icon: FileText },
-            { id: 'yearly', label: 'Anual', icon: Package },
-          ].map((type) => (
-            <button
-              key={type.id}
-              onClick={() => setReportType(type.id as ReportType)}
-              className={`p-4 rounded-2xl border transition-all flex flex-col items-center gap-3 ${
-                reportType === type.id 
-                  ? 'bg-blue-600 border-blue-600 text-white shadow-lg shadow-blue-200' 
-                  : 'bg-white border-slate-100 text-slate-600 hover:border-blue-200 hover:bg-blue-50/30'
-              }`}
-            >
-              <type.icon className={`w-6 h-6 ${reportType === type.id ? 'text-white' : 'text-blue-500'}`} />
-              <span className="font-bold text-sm">{type.label}</span>
-            </button>
-          ))}
+        <div className="space-y-4">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            {[
+              { id: 'daily', label: 'Diário', icon: Calendar },
+              { id: 'weekly', label: 'Semanal', icon: TrendingUp },
+              { id: 'monthly', label: 'Mensal', icon: FileText },
+              { id: 'yearly', label: 'Anual', icon: Package },
+            ].map((type) => (
+              <button
+                key={type.id}
+                onClick={() => setReportType(type.id as ReportType)}
+                className={`p-4 rounded-2xl border transition-all flex flex-col items-center gap-3 ${
+                  reportType === type.id
+                    ? 'bg-blue-600 border-blue-600 text-white shadow-lg shadow-blue-200'
+                    : 'bg-white border-slate-100 text-slate-600 hover:border-blue-200 hover:bg-blue-50/30'
+                }`}
+              >
+                <type.icon className={`w-6 h-6 ${reportType === type.id ? 'text-white' : 'text-blue-500'}`} />
+                <span className="font-bold text-sm">{type.label}</span>
+              </button>
+            ))}
+          </div>
+          <div className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
+              <div>
+                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">
+                  Filtrar por Caixa/Operador
+                </label>
+                <select
+                  value={operatorFilter}
+                  onChange={(e) => setOperatorFilter(e.target.value)}
+                  className="w-full px-4 py-2 border border-slate-200 rounded-xl text-slate-700 bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                >
+                  <option value="all">Todos</option>
+                  {operatorOptions.map((operator) => (
+                    <option key={operator.id} value={operator.id}>
+                      {operator.name} ({getSellerRoleLabel(operator.role)})
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">
+                  Data início
+                </label>
+                <input
+                  type="date"
+                  value={startDate}
+                  onChange={(e) => setStartDate(e.target.value)}
+                  className="w-full px-4 py-2 border border-slate-200 rounded-xl text-slate-700 bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">
+                  Data fim
+                </label>
+                <div className="flex gap-2">
+                  <input
+                    type="date"
+                    value={endDate}
+                    onChange={(e) => setEndDate(e.target.value)}
+                    className="w-full px-4 py-2 border border-slate-200 rounded-xl text-slate-700 bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setStartDate('');
+                      setEndDate('');
+                    }}
+                    className="px-3 py-2 text-xs font-semibold text-slate-600 border border-slate-200 rounded-xl hover:bg-slate-100"
+                  >
+                    Limpar
+                  </button>
+                </div>
+              </div>
+            </div>
+            {isDateRangeInvalid && (
+              <p className="mt-3 text-xs font-semibold text-red-600">
+                Intervalo inválido: a data início deve ser menor ou igual à data fim.
+              </p>
+            )}
+          </div>
         </div>
       )}
 
@@ -236,7 +322,7 @@ export const Reports: React.FC<ReportsProps> = ({ orders, customers, laundryItem
               <tr className="bg-slate-50/50">
                 <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">ID</th>
                 <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Cliente</th>
-                {!isCashier && <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Caixa/Vendedor</th>}
+                {!isCashier && <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Caixa/Operador</th>}
                 <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Data</th>
                 <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Total</th>
               </tr>

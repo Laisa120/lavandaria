@@ -12,16 +12,16 @@ import {
   ShoppingBag,
   Printer,
   Pencil,
-  FileDown
+  FileDown,
+  User as UserIcon
 } from 'lucide-react';
 import { Order, Customer, LaundryItem, OrderItem, LaundrySettings } from '../types';
 import { STATUS_COLORS, STATUS_LABELS } from '../constants';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { Invoice } from './Invoice';
-import jsPDF from 'jspdf';
-import 'jspdf-autotable';
 import { formatCurrencyAO } from '../lib/format';
+import { loadPdfWithAutoTable } from '../lib/pdf';
 
 interface OrdersProps {
   orders: Order[];
@@ -134,36 +134,40 @@ export const Orders: React.FC<OrdersProps> = ({
     setSelectedItems([]);
   };
 
-  const handleExportPDF = () => {
-    const doc = new jsPDF();
-    
-    // Add title
-    doc.setFontSize(18);
-    doc.text('Relatório de Pedidos - Lavandaria', 14, 22);
-    doc.setFontSize(11);
-    doc.setTextColor(100);
-    doc.text(`Gerado em: ${format(new Date(), 'dd/MM/yyyy HH:mm')}`, 14, 30);
+  const handleExportPDF = async () => {
+    try {
+      const { jsPDF, autoTable } = await loadPdfWithAutoTable();
+      const doc = new jsPDF();
 
-    const tableData = filteredOrders.map(order => {
-      const customer = customers.find(c => c.id === order.customerId);
-      return [
-        order.id.slice(0, 8).toUpperCase(),
-        customer?.name || 'N/A',
-        format(new Date(order.createdAt), 'dd/MM/yyyy'),
-        STATUS_LABELS[order.status],
-        formatCurrencyAO(order.total)
-      ];
-    });
+      doc.setFontSize(18);
+      doc.text('Relatório de Pedidos - Lavandaria', 14, 22);
+      doc.setFontSize(11);
+      doc.setTextColor(100);
+      doc.text(`Gerado em: ${format(new Date(), 'dd/MM/yyyy HH:mm')}`, 14, 30);
 
-    (doc as any).autoTable({
-      startY: 40,
-      head: [['ID', 'Cliente', 'Data', 'Status', 'Total']],
-      body: tableData,
-      theme: 'striped',
-      headStyles: { fillColor: [37, 99, 235] }, // blue-600
-    });
+      const tableData = filteredOrders.map(order => {
+        const customer = customers.find(c => c.id === order.customerId);
+        return [
+          order.id.slice(0, 8).toUpperCase(),
+          customer?.name || 'N/A',
+          format(new Date(order.createdAt), 'dd/MM/yyyy'),
+          STATUS_LABELS[order.status],
+          formatCurrencyAO(order.total)
+        ];
+      });
 
-    doc.save(`relatorio-pedidos-${format(new Date(), 'yyyy-MM-dd')}.pdf`);
+      autoTable(doc, {
+        startY: 40,
+        head: [['ID', 'Cliente', 'Data', 'Status', 'Total']],
+        body: tableData,
+        theme: 'striped',
+        headStyles: { fillColor: [37, 99, 235] },
+      });
+
+      doc.save(`relatorio-pedidos-${format(new Date(), 'yyyy-MM-dd')}.pdf`);
+    } catch (error) {
+      alert(error instanceof Error ? error.message : 'Falha ao exportar PDF.');
+    }
   };
 
   return (
@@ -237,6 +241,10 @@ export const Orders: React.FC<OrdersProps> = ({
                     <p className="text-sm text-slate-500 flex items-center gap-1">
                       <AlertCircle className="w-3 h-3" />
                       Entrega prevista: {format(new Date(order.expectedDelivery), 'dd/MM/yyyy')}
+                    </p>
+                    <p className="text-xs text-slate-500 flex items-center gap-1 mt-1">
+                      <UserIcon className="w-3 h-3" />
+                      {order.createdByUserRole === 'cashier' ? 'Caixa' : 'Operador'}: {order.createdByUserName || 'Sistema'}
                     </p>
                   </div>
                 </div>

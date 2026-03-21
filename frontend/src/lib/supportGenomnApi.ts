@@ -1,7 +1,22 @@
 const API_BASE = (import.meta.env.VITE_API_BASE_URL ?? '/api').replace(/\/$/, '');
+const LOCAL_API_FALLBACK = 'http://127.0.0.1:8000/api';
+const LOCAL_API_FALLBACK_ALT = 'http://localhost:8000/api';
 
-async function apiRequest<T>(path: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(`${API_BASE}${path}`, {
+class ApiRequestError extends Error {
+  constructor(message: string, public readonly status: number) {
+    super(message);
+    this.name = 'ApiRequestError';
+  }
+}
+
+function canUseLocalFallback(): boolean {
+  if (typeof window === 'undefined') return false;
+  if (!API_BASE.startsWith('/')) return false;
+  return window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+}
+
+async function doApiRequest<T>(base: string, path: string, init?: RequestInit): Promise<T> {
+  const response = await fetch(`${base}${path}`, {
     ...init,
     headers: {
       'Content-Type': 'application/json',
@@ -10,13 +25,54 @@ async function apiRequest<T>(path: string, init?: RequestInit): Promise<T> {
   });
 
   const text = await response.text();
-  const data = text ? JSON.parse(text) : null;
+  let data: unknown = null;
+  if (text) {
+    try {
+      data = JSON.parse(text);
+    } catch {
+      data = { message: text };
+    }
+  }
 
   if (!response.ok) {
-    throw new Error(data?.message ?? `Erro na API (${response.status})`);
+    const message =
+      typeof data === 'object' && data !== null && 'message' in data && typeof (data as { message?: unknown }).message === 'string'
+        ? (data as { message: string }).message
+        : `Erro na API (${response.status})`;
+    throw new ApiRequestError(message, response.status);
   }
 
   return data as T;
+}
+
+async function apiRequest<T>(path: string, init?: RequestInit): Promise<T> {
+  try {
+    return await doApiRequest<T>(API_BASE, path, init);
+  } catch (error) {
+    if (canUseLocalFallback()) {
+      if (error instanceof TypeError) {
+        try {
+          return await doApiRequest<T>(LOCAL_API_FALLBACK, path, init);
+        } catch {
+          return doApiRequest<T>(LOCAL_API_FALLBACK_ALT, path, init);
+        }
+      }
+
+      if (error instanceof ApiRequestError && error.status === 404) {
+        try {
+          return await doApiRequest<T>(LOCAL_API_FALLBACK, path, init);
+        } catch {
+          return doApiRequest<T>(LOCAL_API_FALLBACK_ALT, path, init);
+        }
+      }
+    }
+
+    if (error instanceof Error) {
+      throw error;
+    }
+
+    throw new Error('Erro de comunicação com a API.');
+  }
 }
 
 export type LicenseCheck = {

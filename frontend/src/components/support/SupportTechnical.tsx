@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
-import { MessageSquare, Send, LifeBuoy, PlusCircle } from 'lucide-react';
+import { MessageSquare, Send, LifeBuoy, PlusCircle, X } from 'lucide-react';
 import { User } from '../../types';
 import {
   checkLicense,
@@ -9,6 +9,7 @@ import {
   sendSupportMessage,
   SupportTicketDto,
 } from '../../lib/supportGenomnApi';
+import { toUserErrorMessage } from '../../lib/userErrors';
 
 interface SupportTechnicalProps {
   user: User;
@@ -22,6 +23,7 @@ export function SupportTechnical({ user, onLicenseStatus }: SupportTechnicalProp
   const [message, setMessage] = useState('');
   const [reply, setReply] = useState('');
   const [loading, setLoading] = useState(false);
+  const [feedback, setFeedback] = useState<{ type: 'error' | 'success'; message: string } | null>(null);
 
   const selectedTicket = useMemo(
     () => tickets.find((ticket) => ticket.id === selectedTicketId) ?? null,
@@ -48,7 +50,7 @@ export function SupportTechnical({ user, onLicenseStatus }: SupportTechnicalProp
       try {
         await loadTickets();
       } catch (error) {
-        alert(error instanceof Error ? error.message : 'Falha ao carregar tickets.');
+        setFeedback({ type: 'error', message: toUserErrorMessage(error, 'Não foi possível carregar os tickets.') });
       }
     };
 
@@ -70,7 +72,7 @@ export function SupportTechnical({ user, onLicenseStatus }: SupportTechnicalProp
       setSubject('');
       setMessage('');
     } catch (error) {
-      alert(error instanceof Error ? error.message : 'Falha ao abrir ticket.');
+      setFeedback({ type: 'error', message: toUserErrorMessage(error, 'Não foi possível abrir o ticket.') });
     } finally {
       setLoading(false);
     }
@@ -89,8 +91,9 @@ export function SupportTechnical({ user, onLicenseStatus }: SupportTechnicalProp
       const refreshed = await getSupportTicket(user.id, selectedTicket.id);
       setTickets((prev) => prev.map((t) => (t.id === refreshed.id ? refreshed : t)));
       setReply('');
+      setFeedback({ type: 'success', message: 'Mensagem enviada ao suporte.' });
     } catch (error) {
-      alert(error instanceof Error ? error.message : 'Falha ao enviar resposta.');
+      setFeedback({ type: 'error', message: toUserErrorMessage(error, 'Não foi possível enviar a mensagem.') });
     } finally {
       setLoading(false);
     }
@@ -101,14 +104,34 @@ export function SupportTechnical({ user, onLicenseStatus }: SupportTechnicalProp
       <div>
         <h2 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
           <LifeBuoy className="w-6 h-6 text-blue-600" />
-          Suporte Técnico
+          Equipa Técnica
         </h2>
-        <p className="text-slate-500">Abra chamados e acompanhe as respostas da equipa técnica.</p>
+        <p className="text-slate-500">Crie tickets, acompanhe e converse com o suporte.</p>
       </div>
+
+      {feedback && (
+        <div
+          className={`rounded-xl border px-4 py-3 text-sm flex items-start justify-between gap-3 ${
+            feedback.type === 'success'
+              ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+              : 'border-red-200 bg-red-50 text-red-700'
+          }`}
+        >
+          <span>{feedback.message}</span>
+          <button
+            type="button"
+            className="inline-flex items-center justify-center rounded-md p-1 hover:bg-white/60"
+            onClick={() => setFeedback(null)}
+            aria-label="Fechar aviso"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-1 space-y-4">
-          <form onSubmit={handleCreateTicket} className="bg-white border border-slate-200 rounded-2xl p-4 space-y-3">
+          <form onSubmit={handleCreateTicket} className="card-modern p-4 space-y-3">
             <h3 className="font-bold text-slate-800 flex items-center gap-2">
               <PlusCircle className="w-5 h-5 text-blue-600" />
               Novo Ticket
@@ -130,20 +153,20 @@ export function SupportTechnical({ user, onLicenseStatus }: SupportTechnicalProp
             <button
               type="submit"
               disabled={loading}
-              className="w-full bg-blue-600 hover:bg-blue-700 text-white rounded-lg py-2 font-semibold disabled:opacity-60"
+              className="w-full bg-[#0e2a47] hover:bg-[#12345a] text-white rounded-lg py-2 font-semibold disabled:opacity-60"
             >
               Abrir Ticket
             </button>
           </form>
 
-          <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
+          <div className="card-modern overflow-hidden">
             <div className="px-4 py-3 border-b border-slate-100 font-semibold text-slate-700">Meus Tickets</div>
             <div className="max-h-[420px] overflow-y-auto divide-y divide-slate-100">
               {tickets.map((ticket) => (
                 <button
                   key={ticket.id}
                   onClick={() => setSelectedTicketId(ticket.id)}
-                  className={`w-full text-left px-4 py-3 transition-colors ${selectedTicketId === ticket.id ? 'bg-blue-50' : 'hover:bg-slate-50'}`}
+                  className={`w-full text-left px-4 py-3 transition-colors ${selectedTicketId === ticket.id ? 'bg-[#dff2ff]' : 'hover:bg-slate-50'}`}
                 >
                   <p className="font-semibold text-slate-800">#{ticket.id} {ticket.subject}</p>
                   <p className="text-xs text-slate-500 uppercase">{ticket.status}</p>
@@ -154,7 +177,7 @@ export function SupportTechnical({ user, onLicenseStatus }: SupportTechnicalProp
           </div>
         </div>
 
-        <div className="lg:col-span-2 bg-white border border-slate-200 rounded-2xl p-4 flex flex-col min-h-[560px]">
+        <div className="lg:col-span-2 card-modern p-4 flex flex-col min-h-[560px]">
           {selectedTicket ? (
             <>
               <div className="border-b border-slate-100 pb-3 mb-3">

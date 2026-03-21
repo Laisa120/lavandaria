@@ -30,9 +30,9 @@ class UsersController extends ApiController
         ]);
 
         $company = Company::query()->firstOrCreate(
-            ['name' => 'LavaSys Demo'],
+            ['name' => 'GenOmni Demo'],
             [
-                'email' => 'contato@lavasys.com',
+                'email' => 'contato@genomni.com',
                 'status' => 'active',
                 'license_type' => 'annual',
                 'license_expiry_date' => now()->addYear()->toDateString(),

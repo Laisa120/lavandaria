@@ -8,7 +8,6 @@ import {
   Globe,
   Save,
   Palette,
-  Bell,
   ShieldCheck,
   Hash,
   Briefcase,
@@ -19,6 +18,8 @@ import {
   Printer
 } from 'lucide-react';
 import { LaundrySettings } from '../types';
+import { fileToOptimizedDataUrl } from '../lib/imageUpload';
+import { applyThemeMode, readThemeMode, saveThemeMode, type ThemeMode } from '../lib/theme';
 
 interface SettingsProps {
   settings: LaundrySettings;
@@ -28,15 +29,29 @@ interface SettingsProps {
 export const Settings: React.FC<SettingsProps> = ({ settings, onUpdateSettings }) => {
   const [formData, setFormData] = useState<LaundrySettings>(settings);
   const [activeSection, setActiveSection] = useState<'basic' | 'address' | 'fiscal' | 'banking' | 'system'>('basic');
+  const [themeMode, setThemeMode] = useState<ThemeMode>(readThemeMode());
 
-  const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleLogoChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setFormData({ ...formData, logo: reader.result as string });
-      };
-      reader.readAsDataURL(file);
+      try {
+        const image = await fileToOptimizedDataUrl(file, { maxWidth: 512, maxHeight: 512, quality: 0.82 });
+        setFormData({ ...formData, logo: image });
+      } catch (error) {
+        alert(error instanceof Error ? error.message : 'Falha ao processar imagem.');
+      }
+    }
+  };
+
+  const handleLandingBannerChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      try {
+        const image = await fileToOptimizedDataUrl(file, { maxWidth: 1920, maxHeight: 1080, quality: 0.8 });
+        setFormData({ ...formData, landingBannerImage: image });
+      } catch (error) {
+        alert(error instanceof Error ? error.message : 'Falha ao processar imagem.');
+      }
     }
   };
 
@@ -44,6 +59,12 @@ export const Settings: React.FC<SettingsProps> = ({ settings, onUpdateSettings }
     e.preventDefault();
     onUpdateSettings(formData);
     alert('Configurações salvas com sucesso!');
+  };
+
+  const handleThemeChange = (mode: ThemeMode) => {
+    setThemeMode(mode);
+    applyThemeMode(mode);
+    saveThemeMode(mode);
   };
 
   const navItems = [
@@ -58,7 +79,7 @@ export const Settings: React.FC<SettingsProps> = ({ settings, onUpdateSettings }
     <div className="max-w-5xl space-y-8">
       <div>
         <h2 className="text-2xl font-bold text-slate-800">Configurações do Sistema</h2>
-        <p className="text-slate-500">Personalize o LavaSys para as necessidades da sua lavandaria.</p>
+        <p className="text-slate-500">Personalize o Sistema de Lavandaria GenOmni para as necessidades da sua lavandaria.</p>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
@@ -82,10 +103,6 @@ export const Settings: React.FC<SettingsProps> = ({ settings, onUpdateSettings }
             <button className="w-full flex items-center gap-3 px-4 py-3 text-slate-500 hover:bg-slate-50 rounded-xl font-medium transition-all">
               <Palette className="w-5 h-5" />
               Aparência
-            </button>
-            <button className="w-full flex items-center gap-3 px-4 py-3 text-slate-500 hover:bg-slate-50 rounded-xl font-medium transition-all">
-              <Bell className="w-5 h-5" />
-              Notificações
             </button>
             <button className="w-full flex items-center gap-3 px-4 py-3 text-slate-500 hover:bg-slate-50 rounded-xl font-medium transition-all">
               <ShieldCheck className="w-5 h-5" />
@@ -138,6 +155,43 @@ export const Settings: React.FC<SettingsProps> = ({ settings, onUpdateSettings }
                           type="file" 
                           accept="image/*"
                           onChange={handleLogoChange}
+                          className="hidden"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-sm font-semibold text-slate-700">Banner da Página Inicial</label>
+                    <div className="rounded-2xl overflow-hidden border border-slate-200 bg-slate-50">
+                      <div className="h-40 w-full relative group">
+                        {formData.landingBannerImage ? (
+                          <>
+                            <img src={formData.landingBannerImage} alt="Preview Banner" className="w-full h-full object-cover" />
+                            <div className="absolute inset-0 bg-black/35 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                              <ImageIcon className="w-7 h-7 text-white" />
+                            </div>
+                          </>
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center text-slate-400">
+                            Sem imagem de banner configurada
+                          </div>
+                        )}
+                      </div>
+                      <div className="p-4 flex items-center justify-between gap-3">
+                        <p className="text-xs text-slate-500">A imagem será exibida no banner da página inicial.</p>
+                        <button
+                          type="button"
+                          onClick={() => document.getElementById('settings-landing-banner-upload')?.click()}
+                          className="px-4 py-2 bg-[#dff2ff] hover:bg-[#cce9fb] text-[#0e2a47] rounded-lg text-xs font-semibold transition-all flex items-center gap-2"
+                        >
+                          <Upload className="w-3.5 h-3.5" />
+                          Trocar Banner
+                        </button>
+                        <input
+                          id="settings-landing-banner-upload"
+                          type="file"
+                          accept="image/*"
+                          onChange={handleLandingBannerChange}
                           className="hidden"
                         />
                       </div>
@@ -385,6 +439,33 @@ export const Settings: React.FC<SettingsProps> = ({ settings, onUpdateSettings }
             {activeSection === 'system' && (
               <div className="space-y-6 animate-in fade-in duration-300">
                 <h3 className="text-lg font-bold text-slate-800 border-b pb-2">Configurações do Sistema</h3>
+                <div className="space-y-2">
+                  <label className="text-sm font-semibold text-slate-700">Tema do Sistema</label>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => handleThemeChange('light')}
+                      className={`px-4 py-2 rounded-xl text-sm font-semibold border ${
+                        themeMode === 'light'
+                          ? 'bg-blue-600 text-white border-blue-600'
+                          : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
+                      }`}
+                    >
+                      Light Mode
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleThemeChange('dark')}
+                      className={`px-4 py-2 rounded-xl text-sm font-semibold border ${
+                        themeMode === 'dark'
+                          ? 'bg-blue-600 text-white border-blue-600'
+                          : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
+                      }`}
+                    >
+                      Dark Mode
+                    </button>
+                  </div>
+                </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="space-y-1.5">
                     <label className="text-sm font-semibold text-slate-700">Modelo de Fatura</label>

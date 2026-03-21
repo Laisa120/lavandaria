@@ -57,6 +57,11 @@ export interface Customer {
 export interface LaundrySettings {
   // Basic Data
   logo?: string;
+  landingBannerImage?: string;
+  aboutStory?: string;
+  aboutMission?: string;
+  aboutVision?: string;
+  aboutTeam?: Array<{ name: string; role: string; photo?: string }>;
   companyName: string;
   tradeName: string;
   nif: string;
@@ -98,4 +103,12 @@ export interface LaundrySettings {
   printerIpAddress?: string;
   autoPrintReceipt: boolean;
   autoDownloadPDF: boolean;
+}
+
+export interface InstitutionalSettings {
+  landingBannerImage?: string;
+  aboutStory?: string;
+  aboutMission?: string;
+  aboutVision?: string;
+  aboutTeam?: Array<{ name: string; role: string; photo?: string }>;
 }

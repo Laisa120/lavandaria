@@ -39,7 +39,7 @@ export const Modal: React.FC<ModalProps> = ({ isOpen, onClose, title, children, 
         onClick={(e) => e.stopPropagation()}
       >
         <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
-          <h3 className="text-xl font-black text-slate-800 uppercase tracking-tight">{title}</h3>
+          <h3 className="text-xl font-bold text-slate-800 tracking-tight">{title}</h3>
           <button 
             onClick={onClose}
             className="p-2 hover:bg-slate-200 rounded-full transition-colors"

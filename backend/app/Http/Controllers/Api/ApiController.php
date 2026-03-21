@@ -8,6 +8,7 @@ use App\Models\Empresa;
 use App\Models\Pedido;
 use App\Models\Servico;
 use App\Models\User;
+use Throwable;
 use Illuminate\Support\Facades\Cache;
 
 abstract class ApiController extends Controller
@@ -125,6 +126,11 @@ abstract class ApiController extends Controller
     {
         return [
             'logo' => $empresa->logo,
+            'landingBannerImage' => $empresa->landing_banner_image,
+            'aboutStory' => $empresa->about_story,
+            'aboutMission' => $empresa->about_mission,
+            'aboutVision' => $empresa->about_vision,
+            'aboutTeam' => $empresa->about_team_json ?? [],
             'companyName' => $empresa->nome,
             'tradeName' => $empresa->nome_comercial ?? '',
             'nif' => $empresa->nif ?? '',
@@ -163,6 +169,11 @@ abstract class ApiController extends Controller
     {
         $empresa->fill([
             'logo' => $settings['logo'] ?? null,
+            'landing_banner_image' => $settings['landingBannerImage'] ?? null,
+            'about_story' => $settings['aboutStory'] ?? null,
+            'about_mission' => $settings['aboutMission'] ?? null,
+            'about_vision' => $settings['aboutVision'] ?? null,
+            'about_team_json' => $settings['aboutTeam'] ?? [],
             'nome' => $settings['companyName'],
             'nome_comercial' => $settings['tradeName'] ?? null,
             'nif' => $settings['nif'] ?? null,
@@ -203,7 +214,11 @@ abstract class ApiController extends Controller
 
     protected function invalidateBootstrapCache(): void
     {
-        Cache::forget(self::BOOTSTRAP_CACHE_KEY);
+        try {
+            Cache::forget(self::BOOTSTRAP_CACHE_KEY);
+        } catch (Throwable $e) {
+            report($e);
+        }
     }
 
     protected function formatCurrencyAO(float $value): string

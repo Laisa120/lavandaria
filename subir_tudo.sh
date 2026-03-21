@@ -3,7 +3,7 @@ set -euo pipefail
 
 BASE_DIR="/home/laisa/Área de trabalho/ambiente_de_producao"
 DOCKER_DIR="$BASE_DIR/docker"
-FRONTEND_DIR="$BASE_DIR/lavasys---sistema-de-faturação-de-lavandaria (2)"
+FRONTEND_DIR="$BASE_DIR/frontend"
 RESET_DB="${1:-}"
 
 echo "[1/5] Subindo containers..."

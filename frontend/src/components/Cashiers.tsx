@@ -227,7 +227,7 @@ export const Cashiers: React.FC<CashiersProps> = ({
                     required
                     type="email" 
                     className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-                    placeholder="caixa@lavasys.com"
+                    placeholder="caixa@genomni.com"
                     value={formData.email}
                     onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                   />

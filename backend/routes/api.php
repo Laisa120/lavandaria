@@ -23,6 +23,7 @@ Route::post('/auth/login', [AuthController::class, 'login']);
 Route::post('/settings/register', [SettingsController::class, 'register']);
 Route::get('/settings', [SettingsController::class, 'show']);
 Route::put('/settings', [SettingsController::class, 'update']);
+Route::put('/settings/institutional', [SettingsController::class, 'updateInstitutional']);
 
 Route::get('/users', [UsersController::class, 'index']);
 Route::post('/users', [UsersController::class, 'store']);

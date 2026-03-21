@@ -16,9 +16,9 @@ interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
 export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
   ({ className, variant = 'primary', size = 'md', isLoading, icon, children, ...props }, ref) => {
     const variants = {
-      primary: 'bg-blue-600 text-white hover:bg-blue-700 shadow-lg shadow-blue-100 border-transparent',
+      primary: 'bg-[#0e2a47] text-white hover:bg-[#12345a] shadow-lg shadow-[#0e2a4730] border-transparent',
       secondary: 'bg-slate-800 text-white hover:bg-slate-900 shadow-lg shadow-slate-100 border-transparent',
-      outline: 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50 hover:border-slate-300',
+      outline: 'bg-white text-[#0e2a47] border-[#bfe4fb] hover:bg-[#eef8ff] hover:border-[#7ec2e7]',
       ghost: 'bg-transparent text-slate-500 hover:bg-slate-100 border-transparent',
       danger: 'bg-red-500 text-white hover:bg-red-600 shadow-lg shadow-red-100 border-transparent',
       success: 'bg-emerald-500 text-white hover:bg-emerald-600 shadow-lg shadow-emerald-100 border-transparent',
@@ -33,7 +33,7 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
     return (
       <button
         className={cn(
-          "inline-flex items-center justify-center gap-2 font-black uppercase tracking-widest transition-all active:scale-95 disabled:opacity-50 disabled:pointer-events-none border",
+          "inline-flex items-center justify-center gap-2 font-semibold tracking-wide transition-all duration-200 active:scale-95 hover:-translate-y-0.5 disabled:opacity-50 disabled:pointer-events-none border",
           variants[variant],
           sizes[size],
           className

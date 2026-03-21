@@ -16,8 +16,8 @@ import {
 import { Order, Customer, LaundryItem, LaundrySettings, DocumentType } from '../types';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import jsPDF from 'jspdf';
 import { formatCurrencyAO, formatNumberAO } from '../lib/format';
+import { loadJsPDF } from '../lib/pdf';
 
 interface InvoiceProps {
   order: Order;
@@ -72,6 +72,7 @@ export const Invoice: React.FC<InvoiceProps> = ({
     
     try {
       setIsGeneratingPDF(true);
+      const jsPDF = await loadJsPDF();
 
       const pdf = new jsPDF({
         orientation: 'portrait',
@@ -91,7 +92,7 @@ export const Invoice: React.FC<InvoiceProps> = ({
 
       const money = (value: number) => formatCurrencyAO(value);
 
-      write(`${type === 'proforma' ? 'FATURA PROFORMA' : 'FATURA'} - LavaSys`, 14, 14, true);
+      write(`${type === 'proforma' ? 'FATURA PROFORMA' : 'FATURA'} - Sistema de Lavandaria GenOmni`, 14, 14, true);
       y += 2;
       write(`Empresa: ${settings.companyName || '-'}`);
       write(`NIF: ${settings.nif || '-'}`);

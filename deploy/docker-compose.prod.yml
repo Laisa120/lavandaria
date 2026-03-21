@@ -19,9 +19,13 @@ services:
       DB_PASSWORD: ${DB_PASSWORD}
       CACHE_STORE: redis
       SESSION_DRIVER: redis
+      SESSION_CONNECTION: default
+      SESSION_STORE: redis
       REDIS_CLIENT: phpredis
       REDIS_HOST: redis
       REDIS_PORT: 6379
+      REDIS_DB: 0
+      REDIS_CACHE_DB: 1
       FRONTEND_URL: ${FRONTEND_URL}
     depends_on:
       - mysql
@@ -46,9 +50,13 @@ services:
       DB_PASSWORD: ${DB_PASSWORD}
       CACHE_STORE: redis
       SESSION_DRIVER: redis
+      SESSION_CONNECTION: default
+      SESSION_STORE: redis
       REDIS_CLIENT: phpredis
       REDIS_HOST: redis
       REDIS_PORT: 6379
+      REDIS_DB: 0
+      REDIS_CACHE_DB: 1
     depends_on:
       - mysql
       - redis

@@ -38,7 +38,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTa
     { id: 'orders', label: 'Pedidos', icon: Shirt, roles: ['admin', 'cashier'] },
     { id: 'customers', label: 'Clientes', icon: Users, roles: ['admin', 'cashier'] },
     { id: 'reports', label: 'Relatórios', icon: FileText, roles: ['admin', 'cashier'] },
-    { id: 'support', label: 'Suporte Técnico', icon: LifeBuoy, roles: ['admin', 'cashier'] },
+    { id: 'support', label: 'Equipa Técnica', icon: LifeBuoy, roles: ['admin', 'cashier'] },
     { id: 'cashiers', label: 'Gerenciar Caixas', icon: UserIcon, roles: ['admin'] },
     { id: 'services', label: 'Serviços', icon: Shirt, roles: ['admin'] },
     { id: 'settings', label: 'Configurações', icon: SettingsIcon, roles: ['admin'] },
@@ -53,18 +53,18 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTa
     });
 
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col md:flex-row print:bg-white print:block">
+    <div className="min-h-screen bg-[linear-gradient(180deg,#f5fbff_0%,#ffffff_40%)] flex flex-col md:flex-row print:bg-white print:block">
       {/* Sidebar - Desktop */}
-      <aside className="hidden md:flex flex-col w-64 bg-white border-r border-slate-200 sticky top-0 h-screen print:hidden">
+      <aside className="hidden md:flex flex-col w-64 bg-white/90 backdrop-blur border-r border-[#d8eaf8] sticky top-0 h-screen print:hidden">
         <div className="p-6 flex items-center gap-3 border-b border-slate-100">
           {settings.logo ? (
             <img src={settings.logo} alt="Logo" className="w-10 h-10 rounded-xl object-cover shadow-lg" referrerPolicy="no-referrer" />
           ) : (
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white shadow-lg shadow-blue-200">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#0e2a47] to-[#4ea9d9] flex items-center justify-center text-white shadow-lg shadow-[#0e2a4730]">
               <Droplets className="w-6 h-6" />
             </div>
           )}
-          <span className="font-bold text-xl tracking-tight text-slate-800 truncate">{settings.tradeName || 'LavaSys'}</span>
+          <span className="font-bold text-xl tracking-tight text-slate-800 truncate">{settings.tradeName || 'Sistema GenOmni'}</span>
         </div>
         
         <nav className="flex-1 p-4 space-y-1">
@@ -75,13 +75,13 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTa
               className={cn(
                 "w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 group",
                 activeTab === item.id 
-                  ? "bg-blue-50 text-blue-600 font-medium" 
+                  ? "bg-[#dff2ff] text-[#0e2a47] font-semibold shadow-md shadow-[#4ea9d922]" 
                   : "text-slate-500 hover:bg-slate-50 hover:text-slate-800"
               )}
             >
               <item.icon className={cn(
                 "w-5 h-5 transition-colors",
-                activeTab === item.id ? "text-blue-600" : "text-slate-400 group-hover:text-slate-600"
+                activeTab === item.id ? "text-[#0e2a47]" : "text-slate-400 group-hover:text-slate-600"
               )} />
               {item.label}
             </button>
@@ -109,16 +109,16 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTa
       </aside>
 
       {/* Mobile Header */}
-      <header className="md:hidden bg-white border-b border-slate-200 p-4 flex items-center justify-between sticky top-0 z-50 print:hidden">
+      <header className="md:hidden bg-white/95 backdrop-blur border-b border-[#d8eaf8] p-4 flex items-center justify-between sticky top-0 z-50 print:hidden">
         <div className="flex items-center gap-2">
           {settings.logo ? (
             <img src={settings.logo} alt="Logo" className="w-8 h-8 rounded-lg object-cover" referrerPolicy="no-referrer" />
           ) : (
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white">
+            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-[#0e2a47] to-[#4ea9d9] flex items-center justify-center text-white">
               <Droplets className="w-5 h-5" />
             </div>
           )}
-          <span className="font-bold text-lg text-slate-800 truncate">{settings.tradeName || 'LavaSys'}</span>
+          <span className="font-bold text-lg text-slate-800 truncate">{settings.tradeName || 'Sistema GenOmni'}</span>
         </div>
         <div className="flex items-center gap-2">
           <button 
@@ -159,7 +159,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTa
                 className={cn(
                   "w-full flex items-center gap-3 px-4 py-4 rounded-xl transition-all",
                   activeTab === item.id 
-                    ? "bg-blue-50 text-blue-600 font-bold" 
+                    ? "bg-[#dff2ff] text-[#0e2a47] font-semibold" 
                     : "text-slate-600"
                 )}
               >

@@ -44,10 +44,41 @@ class SettingsController extends ApiController
         return response()->json($this->mapSettings($empresa));
     }
 
+    public function updateInstitutional(Request $request): JsonResponse
+    {
+        $empresa = $this->currentEmpresa();
+        if (! $empresa) {
+            return response()->json(['message' => 'Empresa não registrada.'], 404);
+        }
+
+        $data = $this->validateInstitutionalSettings($request);
+
+        $empresa->fill([
+            'landing_banner_image' => $data['landingBannerImage'] ?? null,
+            'about_story' => $data['aboutStory'] ?? null,
+            'about_mission' => $data['aboutMission'] ?? null,
+            'about_vision' => $data['aboutVision'] ?? null,
+            'about_team_json' => $data['aboutTeam'] ?? [],
+        ]);
+        $empresa->save();
+
+        $this->invalidateBootstrapCache();
+
+        return response()->json($this->mapSettings($empresa));
+    }
+
     private function validateSettings(Request $request): array
     {
         return $request->validate([
             'logo' => ['nullable', 'string'],
+            'landingBannerImage' => ['nullable', 'string'],
+            'aboutStory' => ['nullable', 'string'],
+            'aboutMission' => ['nullable', 'string'],
+            'aboutVision' => ['nullable', 'string'],
+            'aboutTeam' => ['nullable', 'array'],
+            'aboutTeam.*.name' => ['required_with:aboutTeam', 'string'],
+            'aboutTeam.*.role' => ['required_with:aboutTeam', 'string'],
+            'aboutTeam.*.photo' => ['nullable', 'string'],
             'companyName' => ['required', 'string', 'min:3'],
             'tradeName' => ['required', 'string', 'min:3'],
             'nif' => ['required', 'string', 'min:5'],
@@ -79,6 +110,20 @@ class SettingsController extends ApiController
             'printerIpAddress' => ['nullable', 'string'],
             'autoPrintReceipt' => ['required', 'boolean'],
             'autoDownloadPDF' => ['required', 'boolean'],
+        ]);
+    }
+
+    private function validateInstitutionalSettings(Request $request): array
+    {
+        return $request->validate([
+            'landingBannerImage' => ['nullable', 'string'],
+            'aboutStory' => ['nullable', 'string'],
+            'aboutMission' => ['nullable', 'string'],
+            'aboutVision' => ['nullable', 'string'],
+            'aboutTeam' => ['nullable', 'array'],
+            'aboutTeam.*.name' => ['required_with:aboutTeam', 'string'],
+            'aboutTeam.*.role' => ['required_with:aboutTeam', 'string'],
+            'aboutTeam.*.photo' => ['nullable', 'string'],
         ]);
     }
 }
