@@ -9,6 +9,7 @@ applyThemeMode(readThemeMode());
 
 const hostname = window.location.hostname;
 const pathname = window.location.pathname;
+const port = window.location.port;
 const isLocalhost = hostname === 'localhost' || hostname === '127.0.0.1';
 
 const appHost = import.meta.env.VITE_APP_HOST || 'app.genomni.com';
@@ -17,7 +18,7 @@ const forcedContext = import.meta.env.VITE_FORCE_CONTEXT as 'app' | 'admin' | un
 
 const isAdminHost = hostname === adminHost;
 const isAppHost = hostname === appHost;
-const isDevAdminRoute = isLocalhost && pathname.startsWith('/admin');
+const isDevAdminRoute = isLocalhost && (pathname.startsWith('/admin') || port === '3001');
 
 const isAdminContext = forcedContext === 'admin'
   ? true

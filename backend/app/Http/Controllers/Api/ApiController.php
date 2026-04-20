@@ -5,7 +5,9 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Cliente;
 use App\Models\Empresa;
+use App\Models\MovimentacaoEstoque;
 use App\Models\Pedido;
+use App\Models\ProdutoEstoque;
 use App\Models\Servico;
 use App\Models\User;
 use Throwable;
@@ -84,6 +86,35 @@ abstract class ApiController extends Controller
             'price' => (float) $servico->preco,
             'priceFormatted' => $this->formatCurrencyAO((float) $servico->preco),
             'category' => $servico->categoria,
+        ];
+    }
+
+    protected function mapProdutoEstoque(ProdutoEstoque $produto): array
+    {
+        return [
+            'id' => (string) $produto->id,
+            'name' => $produto->nome,
+            'category' => $produto->categoria,
+            'quantityCurrent' => (float) $produto->quantidade_atual,
+            'quantityMinimum' => (float) $produto->quantidade_minima,
+            'unit' => $produto->unidade,
+            'linkedServiceId' => $produto->servico_id ? (string) $produto->servico_id : null,
+            'consumptionPerService' => (float) $produto->consumo_por_venda,
+            'createdAt' => $produto->created_at?->toJSON(),
+            'updatedAt' => $produto->updated_at?->toJSON(),
+        ];
+    }
+
+    protected function mapMovimentacaoEstoque(MovimentacaoEstoque $movimentacao): array
+    {
+        return [
+            'id' => (string) $movimentacao->id,
+            'productId' => (string) $movimentacao->produto_estoque_id,
+            'productName' => $movimentacao->produto?->nome ?? 'Produto',
+            'type' => $movimentacao->tipo === 'entrada' ? 'entry' : 'exit',
+            'quantity' => (float) $movimentacao->quantidade,
+            'note' => $movimentacao->observacao,
+            'createdAt' => $movimentacao->created_at?->toJSON(),
         ];
     }
 

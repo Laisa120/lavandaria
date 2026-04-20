@@ -86,6 +86,11 @@ async function apiRequest<T>(path: string, init?: RequestInit): Promise<T> {
       }
     }
 
+    if (error instanceof ApiRequestError && error.status >= 500) {
+      await new Promise((resolve) => setTimeout(resolve, 250));
+      return doApiRequest<T>(API_BASE, path, init);
+    }
+
     if (error instanceof Error) {
       throw error;
     }

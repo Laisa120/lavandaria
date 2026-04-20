@@ -2,7 +2,7 @@ services:
   # BACKEND (Laravel)
   - type: web
     name: lavasys-backend
-    env: docker
+    runtime: docker
     rootDir: backend
     dockerfilePath: ./Dockerfile.render
     plan: starter
@@ -33,18 +33,28 @@ services:
         value: redis
       - key: SESSION_DRIVER
         value: redis
+      - key: SESSION_CONNECTION
+        value: default
+      - key: SESSION_STORE
+        value: redis
+      - key: QUEUE_CONNECTION
+        value: redis
       - key: REDIS_CLIENT
         value: phpredis
       - key: REDIS_HOST
         fromService:
-          type: redis
+          type: keyvalue
           name: lavasys-redis
           property: host
       - key: REDIS_PORT
         fromService:
-          type: redis
+          type: keyvalue
           name: lavasys-redis
           property: port
+      - key: REDIS_QUEUE_CONNECTION
+        value: default
+      - key: REDIS_QUEUE
+        value: default
       - key: FRONTEND_URL
         sync: false
       - key: APP_FRONTEND_URL
@@ -57,9 +67,10 @@ services:
   # WORKER (SEM startCommand ❗)
   - type: worker
     name: lavasys-queue
-    env: docker
+    runtime: docker
     rootDir: backend
     dockerfilePath: ./Dockerfile.render
+    dockerCommand: php artisan queue:work redis --sleep=1 --tries=3 --timeout=120
     plan: starter
     autoDeploy: true
     envVars:
@@ -87,21 +98,31 @@ services:
         value: redis
       - key: SESSION_DRIVER
         value: redis
+      - key: SESSION_CONNECTION
+        value: default
+      - key: SESSION_STORE
+        value: redis
+      - key: QUEUE_CONNECTION
+        value: redis
       - key: REDIS_CLIENT
         value: phpredis
       - key: REDIS_HOST
         fromService:
-          type: redis
+          type: keyvalue
           name: lavasys-redis
           property: host
       - key: REDIS_PORT
         fromService:
-          type: redis
+          type: keyvalue
           name: lavasys-redis
           property: port
+      - key: REDIS_QUEUE_CONNECTION
+        value: default
+      - key: REDIS_QUEUE
+        value: default
 
   # REDIS (corrigido)
-  - type: redis
+  - type: keyvalue
     name: lavasys-redis
     plan: starter
     ipAllowList: []   # 🔥 permite acesso interno
@@ -110,12 +131,18 @@ services:
   # FRONTEND CLIENTE (app.genomni.com)
   - type: web
     name: genomni-app
-    env: static
+    runtime: static
     rootDir: frontend
     buildCommand: npm ci && npm run build
     staticPublishPath: dist
     autoDeploy: true
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
     envVars:
+      - key: NODE_VERSION
+        value: 20
       - key: VITE_API_BASE_URL
         sync: false
       - key: VITE_APP_HOST
@@ -128,12 +155,18 @@ services:
   # FRONTEND ADMIN (admin.genomni.com)
   - type: web
     name: genomni-admin
-    env: static
+    runtime: static
     rootDir: frontend
     buildCommand: npm ci && npm run build
     staticPublishPath: dist
     autoDeploy: true
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
     envVars:
+      - key: NODE_VERSION
+        value: 20
       - key: VITE_API_BASE_URL
         sync: false
       - key: VITE_APP_HOST

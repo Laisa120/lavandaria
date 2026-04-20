@@ -37,6 +37,10 @@ export function toUserErrorMessage(error: unknown, fallback: string): string {
       return fallback;
     }
 
+    if (lower.includes('<!doctype html') || lower.includes('<html') || lower.includes('<body')) {
+      return 'O servidor devolveu uma resposta inválida. Reinicie o backend e tente novamente.';
+    }
+
     if (lower.startsWith('erro na requisição') || lower.startsWith('erro na api')) {
       return fallback;
     }

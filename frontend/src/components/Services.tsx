@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { 
   Plus, 
   Search, 
@@ -6,17 +6,26 @@ import {
   Edit2,
   Shirt,
   Tag,
-  Banknote
+  Banknote,
+  Boxes
 } from 'lucide-react';
 import { LaundryItem } from '../types';
 import { formatCurrencyAO } from '../lib/format';
+import { listStock, updateStockItem } from '../pages/stock/stockApi';
+import type { StockItem } from '../types/stock';
 
 interface ServicesProps {
   services: LaundryItem[];
-  onAddService: (service: LaundryItem) => Promise<void>;
-  onUpdateService: (service: LaundryItem) => Promise<void>;
+  onAddService: (service: LaundryItem) => Promise<LaundryItem>;
+  onUpdateService: (service: LaundryItem) => Promise<LaundryItem>;
   onDeleteService: (serviceId: string) => Promise<void>;
 }
+
+type StockLinkDraft = {
+  stockId: string;
+  enabled: boolean;
+  consumptionPerService: number;
+};
 
 export const Services: React.FC<ServicesProps> = ({ 
   services, 
@@ -27,11 +36,95 @@ export const Services: React.FC<ServicesProps> = ({
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingService, setEditingService] = useState<LaundryItem | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [stockItems, setStockItems] = useState<StockItem[]>([]);
+  const [stockLinks, setStockLinks] = useState<StockLinkDraft[]>([]);
+  const [stockNotice, setStockNotice] = useState('');
   const [newService, setNewService] = useState({
     name: '',
     price: '',
     category: 'clothing' as LaundryItem['category']
   });
+
+  const loadStock = async () => {
+    try {
+      const items = await listStock();
+      setStockItems(items);
+      setStockNotice('');
+    } catch {
+      setStockNotice('Não foi possível carregar os produtos de estoque para vinculação automática.');
+    }
+  };
+
+  useEffect(() => {
+    void loadStock();
+  }, []);
+
+  useEffect(() => {
+    if (!isModalOpen) return;
+    setStockLinks(buildStockDrafts(editingService?.id));
+  }, [isModalOpen, editingService, stockItems]);
+
+  const linkedStockCountByService = useMemo(() => {
+    return stockItems.reduce<Record<string, number>>((acc, item) => {
+      if (!item.linkedServiceId) return acc;
+      acc[item.linkedServiceId] = (acc[item.linkedServiceId] ?? 0) + 1;
+      return acc;
+    }, {});
+  }, [stockItems]);
+
+  const buildStockDrafts = (serviceId?: string) =>
+    stockItems.map((item) => ({
+      stockId: item.id,
+      enabled: item.linkedServiceId === serviceId,
+      consumptionPerService: item.consumptionPerService ?? 1,
+    }));
+
+  const persistStockLinks = async (serviceId: string) => {
+    const currentItems = await listStock();
+    const draftsById = new Map(stockLinks.map((draft) => [draft.stockId, draft]));
+
+    const updates = currentItems.flatMap((item) => {
+      const draft = draftsById.get(item.id);
+      const isLinkedToCurrentService = item.linkedServiceId === serviceId;
+
+      if (!draft) {
+        return [];
+      }
+
+      if (draft.enabled) {
+        return [
+          updateStockItem(item.id, {
+            name: item.name,
+            category: item.category,
+            quantityCurrent: item.quantityCurrent,
+            quantityMinimum: item.quantityMinimum,
+            unit: item.unit,
+            linkedServiceId: serviceId,
+            consumptionPerService: draft.consumptionPerService,
+          }),
+        ];
+      }
+
+      if (isLinkedToCurrentService) {
+        return [
+          updateStockItem(item.id, {
+            name: item.name,
+            category: item.category,
+            quantityCurrent: item.quantityCurrent,
+            quantityMinimum: item.quantityMinimum,
+            unit: item.unit,
+            linkedServiceId: null,
+            consumptionPerService: item.consumptionPerService ?? 1,
+          }),
+        ];
+      }
+
+      return [];
+    });
+
+    await Promise.all(updates);
+    await loadStock();
+  };
 
   const filteredServices = services.filter(s => 
     s.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
@@ -40,6 +133,7 @@ export const Services: React.FC<ServicesProps> = ({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setStockNotice('');
 
     try {
       const service: LaundryItem = {
@@ -49,15 +143,13 @@ export const Services: React.FC<ServicesProps> = ({
         category: newService.category
       };
 
-      if (editingService) {
-        await onUpdateService(service);
-      } else {
-        await onAddService(service);
-      }
+      const savedService = editingService ? await onUpdateService(service) : await onAddService(service);
+      await persistStockLinks(savedService.id);
 
       setIsModalOpen(false);
       setEditingService(null);
       setNewService({ name: '', price: '', category: 'clothing' });
+      setStockLinks(buildStockDrafts());
     } catch {
       // Error handled in App.
     }
@@ -74,6 +166,7 @@ export const Services: React.FC<ServicesProps> = ({
   const openCreateModal = () => {
     setEditingService(null);
     setNewService({ name: '', price: '', category: 'clothing' });
+    setStockNotice('');
     setIsModalOpen(true);
   };
 
@@ -84,6 +177,7 @@ export const Services: React.FC<ServicesProps> = ({
       price: String(service.price),
       category: service.category,
     });
+    setStockNotice('');
     setIsModalOpen(true);
   };
 
@@ -145,6 +239,9 @@ export const Services: React.FC<ServicesProps> = ({
             <div className="flex items-center gap-2 mb-4">
               <span className="px-2 py-0.5 bg-slate-100 text-slate-500 rounded-md text-[10px] font-bold uppercase tracking-wider">
                 {service.category}
+              </span>
+              <span className="px-2 py-0.5 bg-blue-50 text-blue-600 rounded-md text-[10px] font-bold uppercase tracking-wider">
+                {linkedStockCountByService[service.id] ?? 0} no estoque
               </span>
             </div>
             
@@ -226,6 +323,82 @@ export const Services: React.FC<ServicesProps> = ({
                     <option value="curtains">Cortinas</option>
                     <option value="other">Outros</option>
                   </select>
+                </div>
+              </div>
+
+              <div className="space-y-3 rounded-2xl border border-slate-100 bg-slate-50 p-4">
+                <div className="flex items-center gap-2">
+                  <Boxes className="w-4 h-4 text-slate-500" />
+                  <div>
+                    <p className="text-sm font-semibold text-slate-700">Consumo automático do estoque</p>
+                    <p className="text-xs text-slate-500">Marque os produtos que este serviço consome a cada venda.</p>
+                  </div>
+                </div>
+
+                {stockNotice ? <p className="text-xs font-medium text-amber-600">{stockNotice}</p> : null}
+
+                <div className="space-y-2 max-h-52 overflow-y-auto pr-1">
+                  {stockItems.length === 0 ? (
+                    <p className="text-sm text-slate-500">Nenhum produto cadastrado no estoque.</p>
+                  ) : (
+                    stockItems.map((item) => {
+                      const draft = stockLinks.find((link) => link.stockId === item.id);
+                      const linkedToAnotherService =
+                        item.linkedServiceId && item.linkedServiceId !== editingService?.id;
+                      const linkedServiceName = linkedToAnotherService
+                        ? services.find((service) => service.id === item.linkedServiceId)?.name ?? 'Outro serviço'
+                        : null;
+
+                      return (
+                        <div key={item.id} className="rounded-xl border border-slate-200 bg-white p-3">
+                          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                            <label className="flex items-start gap-3">
+                              <input
+                                type="checkbox"
+                                className="mt-1 h-4 w-4 rounded border-slate-300"
+                                checked={draft?.enabled ?? false}
+                                disabled={Boolean(linkedToAnotherService)}
+                                onChange={(event) =>
+                                  setStockLinks((prev) =>
+                                    prev.map((link) =>
+                                      link.stockId === item.id ? { ...link, enabled: event.target.checked } : link,
+                                    ),
+                                  )
+                                }
+                              />
+                              <span>
+                                <span className="block text-sm font-semibold text-slate-700">{item.name}</span>
+                                <span className="block text-xs text-slate-500">
+                                  {item.quantityCurrent} {item.unit} em base
+                                  {linkedServiceName ? ` • ligado a ${linkedServiceName}` : ''}
+                                </span>
+                              </span>
+                            </label>
+
+                            <div className="w-full md:w-32">
+                              <input
+                                type="number"
+                                min="1"
+                                className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/10"
+                                value={draft?.consumptionPerService ?? 1}
+                                disabled={!draft?.enabled || Boolean(linkedToAnotherService)}
+                                onChange={(event) =>
+                                  setStockLinks((prev) =>
+                                    prev.map((link) =>
+                                      link.stockId === item.id
+                                        ? { ...link, consumptionPerService: Number(event.target.value) || 1 }
+                                        : link,
+                                    ),
+                                  )
+                                }
+                              />
+                              <p className="mt-1 text-[10px] font-medium text-slate-400">Consumo por venda</p>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })
+                  )}
                 </div>
               </div>
               

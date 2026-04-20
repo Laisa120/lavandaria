@@ -3,8 +3,13 @@
   "private": true,
   "version": "0.0.0",
   "type": "module",
+  "engines": {
+    "node": "20.x"
+  },
   "scripts": {
     "dev": "vite --port=3000 --host=0.0.0.0",
+    "dev:client": "vite --port=3000 --host=0.0.0.0",
+    "dev:admin": "vite --port=3001 --host=0.0.0.0",
     "build": "vite build",
     "preview": "vite preview",
     "clean": "rm -rf dist",

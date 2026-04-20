@@ -20,7 +20,9 @@ import {
   updateService,
   updateUser,
 } from './lib/api';
+import { listStock } from './pages/stock/stockApi';
 import { toUserErrorMessage } from './lib/userErrors';
+import type { StockItem } from './types/stock';
 
 const Layout = lazy(() => import('./components/Layout').then((m) => ({ default: m.Layout })));
 const Dashboard = lazy(() => import('./components/Dashboard').then((m) => ({ default: m.Dashboard })));
@@ -38,8 +40,14 @@ const SupportTechnical = lazy(() =>
   import('./components/support/SupportTechnical').then((m) => ({ default: m.SupportTechnical })),
 );
 const AboutPage = lazy(() => import('./components/AboutPage').then((m) => ({ default: m.AboutPage })));
+const StockPage = lazy(() => import('./pages/stock/StockPage'));
 
 const SESSION_KEY = 'lavasys_session_state';
+
+function getPublicRoute(pathname: string): 'landing' | 'about' {
+  if (pathname === '/about') return 'about';
+  return 'landing';
+}
 
 function createEmptySettings(): LaundrySettings {
   return {
@@ -87,15 +95,26 @@ export default function App() {
   const [startupError, setStartupError] = useState('');
   const [licenseBlockedMessage, setLicenseBlockedMessage] = useState('');
   const [showWelcomeBanner, setShowWelcomeBanner] = useState(true);
-  const [publicRoute, setPublicRoute] = useState<'landing' | 'about'>(
-    window.location.pathname === '/about' ? 'about' : 'landing',
-  );
+  const [publicRoute, setPublicRoute] = useState<'landing' | 'about'>(getPublicRoute(window.location.pathname));
 
   const [orders, setOrders] = useState<Order[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [laundryItems, setLaundryItems] = useState<LaundryItem[]>([]);
   const [settings, setSettings] = useState<LaundrySettings>(createEmptySettings());
   const [users, setUsers] = useState<User[]>([]);
+  const [stockItems, setStockItems] = useState<StockItem[]>([]);
+
+  const shouldApplyAutomaticOutput = (order: Order) =>
+    order.status === 'processing' || order.status === 'ready' || order.status === 'delivered';
+
+  const loadStockSummary = async () => {
+    try {
+      const items = await listStock();
+      setStockItems(items);
+    } catch {
+      setStockItems([]);
+    }
+  };
 
   const loadBootstrap = async () => {
     setIsBootstrapping(true);
@@ -143,8 +162,62 @@ export default function App() {
   }, []);
 
   useEffect(() => {
+    void loadStockSummary();
+  }, []);
+
+  useEffect(() => {
+    void loadStockSummary();
+  }, [activeTab]);
+
+  useEffect(() => {
+    const handleFocus = () => {
+      void loadStockSummary();
+    };
+
+    const handleStorage = (event: StorageEvent) => {
+      if (event.key === 'genomni_stock_items' || event.key === 'genomni_stock_movements') {
+        void loadStockSummary();
+      }
+    };
+
+    window.addEventListener('focus', handleFocus);
+    window.addEventListener('storage', handleStorage);
+
+    return () => {
+      window.removeEventListener('focus', handleFocus);
+      window.removeEventListener('storage', handleStorage);
+    };
+  }, []);
+
+  const stockLowCount = stockItems.filter((item) => {
+    const automaticOutputQuantity = item.linkedServiceId
+      ? orders
+          .filter(shouldApplyAutomaticOutput)
+          .flatMap((order) => order.items)
+          .filter((orderItem) => orderItem.itemId === item.linkedServiceId)
+          .reduce((total, orderItem) => total + orderItem.quantity * (item.consumptionPerService ?? 1), 0)
+      : 0;
+
+    const quantityAvailable = item.quantityCurrent - automaticOutputQuantity;
+    return quantityAvailable <= item.quantityMinimum;
+  }).length;
+
+  const stockCriticalCount = stockItems.filter((item) => {
+    const automaticOutputQuantity = item.linkedServiceId
+      ? orders
+          .filter(shouldApplyAutomaticOutput)
+          .flatMap((order) => order.items)
+          .filter((orderItem) => orderItem.itemId === item.linkedServiceId)
+          .reduce((total, orderItem) => total + orderItem.quantity * (item.consumptionPerService ?? 1), 0)
+      : 0;
+
+    const quantityAvailable = item.quantityCurrent - automaticOutputQuantity;
+    return quantityAvailable < 0;
+  }).length;
+
+  useEffect(() => {
     const handlePopState = () => {
-      setPublicRoute(window.location.pathname === '/about' ? 'about' : 'landing');
+      setPublicRoute(getPublicRoute(window.location.pathname));
     };
 
     window.addEventListener('popstate', handlePopState);
@@ -301,8 +374,10 @@ export default function App() {
         category: service.category,
       });
       setLaundryItems((prev) => [created, ...prev]);
+      return created;
     } catch (error) {
       alert(toUserErrorMessage(error, 'Não foi possível criar o serviço.'));
+      throw error;
     }
   };
 
@@ -325,8 +400,10 @@ export default function App() {
         category: service.category,
       });
       setLaundryItems((prev) => prev.map((item) => (item.id === saved.id ? saved : item)));
+      return saved;
     } catch (error) {
       alert(toUserErrorMessage(error, 'Não foi possível editar o serviço.'));
+      throw error;
     }
   };
 
@@ -527,6 +604,8 @@ export default function App() {
             onDeleteService={handleDeleteService}
           />
         ) : null;
+      case 'stock':
+        return user.role === 'admin' ? <StockPage orders={orders} services={laundryItems} /> : null;
       case 'cashiers':
         return user.role === 'admin' ? (
           <Cashiers
@@ -567,7 +646,15 @@ export default function App() {
 
   return (
     <Suspense fallback={pageLoader}>
-      <Layout activeTab={activeTab} setActiveTab={setActiveTab} user={user} settings={settings} onLogout={handleLogout}>
+      <Layout
+        activeTab={activeTab}
+        setActiveTab={setActiveTab}
+        user={user}
+        settings={settings}
+        onLogout={handleLogout}
+        stockLowCount={stockLowCount}
+        stockCriticalCount={stockCriticalCount}
+      >
         {renderContent()}
       </Layout>
     </Suspense>

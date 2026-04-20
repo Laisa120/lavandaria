@@ -6,7 +6,7 @@ DOCKER_DIR="$BASE_DIR/docker"
 FRONTEND_DIR="$BASE_DIR/frontend"
 RESET_DB="${1:-}"
 
-echo "[1/5] Subindo containers..."
+echo "[1/6] Subindo containers..."
 cd "$DOCKER_DIR"
 docker-compose up -d --build
 
@@ -16,7 +16,15 @@ grep -q '^APP_KEY=' .env || echo 'APP_KEY=' >> .env
 grep -q '^CACHE_STORE=' .env || echo 'CACHE_STORE=redis' >> .env
 grep -q '^SESSION_DRIVER=' .env || echo 'SESSION_DRIVER=redis' >> .env
 grep -q '^REDIS_CLIENT=' .env || echo 'REDIS_CLIENT=phpredis' >> .env
+grep -q '^QUEUE_CONNECTION=' .env || echo 'QUEUE_CONNECTION=redis' >> .env
+grep -q '^SESSION_CONNECTION=' .env || echo 'SESSION_CONNECTION=default' >> .env
+grep -q '^SESSION_STORE=' .env || echo 'SESSION_STORE=redis' >> .env
 grep -q '^REDIS_PORT=' .env || echo 'REDIS_PORT=6379' >> .env
+grep -q '^REDIS_HOST=' .env || echo 'REDIS_HOST=redis' >> .env
+grep -q '^REDIS_DB=' .env || echo 'REDIS_DB=0' >> .env
+grep -q '^REDIS_CACHE_DB=' .env || echo 'REDIS_CACHE_DB=1' >> .env
+grep -q '^REDIS_QUEUE_CONNECTION=' .env || echo 'REDIS_QUEUE_CONNECTION=default' >> .env
+grep -q '^REDIS_QUEUE=' .env || echo 'REDIS_QUEUE=default' >> .env
 
 echo "[3/6] Instalando dependências do Laravel..."
 cd "$DOCKER_DIR"
@@ -39,9 +47,13 @@ echo "[5/6] Instalando dependências do frontend..."
 cd "$FRONTEND_DIR"
 npm install
 
-echo "[6/6] Iniciando frontend em modo desenvolvimento..."
-echo "Frontend: http://localhost:3000"
+echo "[6/6] Iniciando frontend cliente em modo desenvolvimento..."
+echo "Cliente:  http://localhost:3000"
+echo "Tecnica:  http://localhost:3001"
 echo "API:      http://localhost:8000/api/bootstrap"
 echo "Login:    admin@lavasys.com / admin123"
+echo ""
+echo "Para subir a area tecnica em outra porta, abra outro terminal e rode:"
+echo "cd \"$FRONTEND_DIR\" && npm run dev:admin"
 
 npm run dev

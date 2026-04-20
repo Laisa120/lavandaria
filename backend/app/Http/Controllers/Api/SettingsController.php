@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Models\Empresa;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 
 class SettingsController extends ApiController
 {
@@ -69,6 +70,8 @@ class SettingsController extends ApiController
 
     private function validateSettings(Request $request): array
     {
+        $empresaAtualId = $this->currentEmpresa()?->id;
+
         return $request->validate([
             'logo' => ['nullable', 'string'],
             'landingBannerImage' => ['nullable', 'string'],
@@ -79,17 +82,40 @@ class SettingsController extends ApiController
             'aboutTeam.*.name' => ['required_with:aboutTeam', 'string'],
             'aboutTeam.*.role' => ['required_with:aboutTeam', 'string'],
             'aboutTeam.*.photo' => ['nullable', 'string'],
-            'companyName' => ['required', 'string', 'min:3'],
-            'tradeName' => ['required', 'string', 'min:3'],
-            'nif' => ['required', 'string', 'min:5'],
-            'companyType' => ['required', 'string'],
+            'companyName' => [
+                'required',
+                'string',
+                'min:3',
+                Rule::unique('empresas', 'nome')->ignore($empresaAtualId),
+            ],
+            'tradeName' => [
+                'required',
+                'string',
+                'min:3',
+                Rule::unique('empresas', 'nome_comercial')->ignore($empresaAtualId),
+            ],
+            'nif' => [
+                'required',
+                'string',
+                'min:5',
+                Rule::unique('empresas', 'nif')->ignore($empresaAtualId),
+            ],
+            'companyType' => [
+                'required',
+                'string',
+                Rule::unique('empresas', 'tipo_empresa')->ignore($empresaAtualId),
+            ],
             'country' => ['required', 'string'],
             'province' => ['required', 'string'],
             'municipality' => ['required', 'string'],
             'fullAddress' => ['required', 'string', 'min:5'],
             'postalCode' => ['nullable', 'string'],
             'phone' => ['required', 'string'],
-            'email' => ['required', 'email'],
+            'email' => [
+                'required',
+                'email',
+                Rule::unique('empresas', 'email')->ignore($empresaAtualId),
+            ],
             'website' => ['nullable', 'string'],
             'ivaRegime' => ['required', 'in:geral,nao_sujeicao,isento'],
             'defaultIvaRate' => ['required', 'numeric', 'min:0'],
@@ -110,6 +136,12 @@ class SettingsController extends ApiController
             'printerIpAddress' => ['nullable', 'string'],
             'autoPrintReceipt' => ['required', 'boolean'],
             'autoDownloadPDF' => ['required', 'boolean'],
+        ], [
+            'companyName.unique' => 'Já existe uma empresa cadastrada com este nome da empresa.',
+            'tradeName.unique' => 'Já existe uma empresa cadastrada com esta razão social.',
+            'nif.unique' => 'Já existe uma empresa cadastrada com este NIF.',
+            'companyType.unique' => 'Já existe uma empresa cadastrada com este tipo de empresa.',
+            'email.unique' => 'Já existe uma empresa cadastrada com este e-mail.',
         ]);
     }
 

@@ -242,6 +242,7 @@ export function AdminApp() {
 
   const handleLogin = async (e: FormEvent) => {
     e.preventDefault();
+    setPanelNotice(null);
     try {
       const res = await adminLogin({ email, password });
       setToken(res.token);
@@ -334,8 +335,28 @@ export function AdminApp() {
               {panelNotice.message}
             </div>
           )}
-          <input value={email} onChange={(e) => setEmail(e.target.value)} className="w-full px-3 py-2 border rounded-lg" type="email" placeholder="email técnico" required />
-          <input value={password} onChange={(e) => setPassword(e.target.value)} className="w-full px-3 py-2 border rounded-lg" type="password" placeholder="senha técnica" required />
+          <input
+            value={email}
+            onChange={(e) => {
+              setEmail(e.target.value);
+              if (panelNotice?.type === 'error') setPanelNotice(null);
+            }}
+            className="w-full px-3 py-2 border rounded-lg"
+            type="email"
+            placeholder="email técnico"
+            required
+          />
+          <input
+            value={password}
+            onChange={(e) => {
+              setPassword(e.target.value);
+              if (panelNotice?.type === 'error') setPanelNotice(null);
+            }}
+            className="w-full px-3 py-2 border rounded-lg"
+            type="password"
+            placeholder="senha técnica"
+            required
+          />
           <button className="w-full bg-[#0e2a47] hover:bg-[#12345a] text-white py-2 rounded-lg font-semibold" type="submit">Entrar</button>
         </form>
       </div>

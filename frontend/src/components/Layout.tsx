@@ -11,7 +11,8 @@ import {
   User as UserIcon,
   Shirt,
   FileText,
-  LifeBuoy
+  LifeBuoy,
+  Boxes
 } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
@@ -28,10 +29,25 @@ interface LayoutProps {
   user: User;
   settings: LaundrySettings;
   onLogout: () => void;
+  stockLowCount?: number;
+  stockCriticalCount?: number;
 }
 
-export const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab, user, settings, onLogout }) => {
+export const Layout: React.FC<LayoutProps> = ({
+  children,
+  activeTab,
+  setActiveTab,
+  user,
+  settings,
+  onLogout,
+  stockLowCount = 0,
+  stockCriticalCount = 0,
+}) => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const stockBadgeClass =
+    stockCriticalCount > 0
+      ? 'bg-red-100 text-red-700'
+      : 'bg-amber-100 text-amber-700';
 
   const navItems = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, roles: ['admin'] },
@@ -41,6 +57,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTa
     { id: 'support', label: 'Equipa Técnica', icon: LifeBuoy, roles: ['admin', 'cashier'] },
     { id: 'cashiers', label: 'Gerenciar Caixas', icon: UserIcon, roles: ['admin'] },
     { id: 'services', label: 'Serviços', icon: Shirt, roles: ['admin'] },
+    { id: 'stock', label: 'Estoque', icon: Boxes, roles: ['admin'] },
     { id: 'settings', label: 'Configurações', icon: SettingsIcon, roles: ['admin'] },
   ]
     .filter(item => item.roles.includes(user.role))
@@ -83,7 +100,12 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTa
                 "w-5 h-5 transition-colors",
                 activeTab === item.id ? "text-[#0e2a47]" : "text-slate-400 group-hover:text-slate-600"
               )} />
-              {item.label}
+              <span className="flex-1 text-left">{item.label}</span>
+              {item.id === 'stock' && stockLowCount > 0 ? (
+                <span className={cn("inline-flex min-w-6 items-center justify-center rounded-full px-2 py-0.5 text-[10px] font-bold", stockBadgeClass)}>
+                  {stockLowCount}
+                </span>
+              ) : null}
             </button>
           ))}
         </nav>
@@ -164,7 +186,12 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTa
                 )}
               >
                 <item.icon className="w-6 h-6" />
-                {item.label}
+                <span className="flex-1 text-left">{item.label}</span>
+                {item.id === 'stock' && stockLowCount > 0 ? (
+                  <span className={cn("inline-flex min-w-6 items-center justify-center rounded-full px-2 py-0.5 text-[10px] font-bold", stockBadgeClass)}>
+                    {stockLowCount}
+                  </span>
+                ) : null}
               </button>
             ))}
           </nav>

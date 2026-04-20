@@ -3,7 +3,9 @@
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\BootstrapController;
 use App\Http\Controllers\Api\CustomersController;
+use App\Http\Controllers\Api\EstoqueController;
 use App\Http\Controllers\Api\LicenseController;
+use App\Http\Controllers\Api\MovimentacaoEstoqueController;
 use App\Http\Controllers\Api\OrdersController;
 use App\Http\Controllers\Api\ServicesController;
 use App\Http\Controllers\Api\SettingsController;
@@ -37,6 +39,14 @@ Route::delete('/customers/{id}', [CustomersController::class, 'destroy']);
 Route::post('/services', [ServicesController::class, 'store']);
 Route::put('/services/{id}', [ServicesController::class, 'update']);
 Route::delete('/services/{id}', [ServicesController::class, 'destroy']);
+
+Route::get('/stock', [EstoqueController::class, 'index']);
+Route::post('/stock', [EstoqueController::class, 'store']);
+Route::put('/stock/{id}', [EstoqueController::class, 'update']);
+Route::delete('/stock/{id}', [EstoqueController::class, 'destroy']);
+
+Route::get('/stock/movements', [MovimentacaoEstoqueController::class, 'index']);
+Route::post('/stock/movements', [MovimentacaoEstoqueController::class, 'store']);
 
 Route::post('/orders', [OrdersController::class, 'store']);
 Route::put('/orders/{id}', [OrdersController::class, 'update']);

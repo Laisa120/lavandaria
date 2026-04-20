@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { 
   Plus, 
   Search, 
@@ -13,7 +13,8 @@ import {
   Printer,
   Pencil,
   FileDown,
-  User as UserIcon
+  User as UserIcon,
+  Boxes
 } from 'lucide-react';
 import { Order, Customer, LaundryItem, OrderItem, LaundrySettings } from '../types';
 import { STATUS_COLORS, STATUS_LABELS } from '../constants';
@@ -22,6 +23,8 @@ import { ptBR } from 'date-fns/locale';
 import { Invoice } from './Invoice';
 import { formatCurrencyAO } from '../lib/format';
 import { loadPdfWithAutoTable } from '../lib/pdf';
+import { listStock } from '../pages/stock/stockApi';
+import type { StockItem } from '../types/stock';
 
 interface OrdersProps {
   orders: Order[];
@@ -54,6 +57,27 @@ export const Orders: React.FC<OrdersProps> = ({
   const [statusFilter, setStatusFilter] = useState<Order['status'] | 'all'>('all');
   const [selectedCustomer, setSelectedCustomer] = useState('');
   const [selectedItems, setSelectedItems] = useState<{ itemId: string, quantity: number }[]>([]);
+  const [stockItems, setStockItems] = useState<StockItem[]>([]);
+  const [stockError, setStockError] = useState('');
+
+  const shouldApplyAutomaticOutput = (status: Order['status']) =>
+    status === 'processing' || status === 'ready' || status === 'delivered';
+
+  useEffect(() => {
+    if (!isModalOpen) return;
+
+    const loadStockData = async () => {
+      try {
+        const items = await listStock();
+        setStockItems(items);
+        setStockError('');
+      } catch {
+        setStockError('Não foi possível calcular o impacto no estoque neste momento.');
+      }
+    };
+
+    void loadStockData();
+  }, [isModalOpen]);
 
   const filteredOrders = orders.filter(order => {
     const customer = customers.find(c => c.id === order.customerId);
@@ -91,6 +115,60 @@ export const Orders: React.FC<OrdersProps> = ({
   const handlePrintOrder = (order: Order) => {
     setCompletedOrder(order);
   };
+
+  const stockImpactPreview = useMemo(() => {
+    const draftStatus = editingOrder?.status ?? 'pending';
+    if (!shouldApplyAutomaticOutput(draftStatus)) {
+      return [];
+    }
+
+    const baseAutomaticUsage = stockItems.map((stockItem) => {
+      const totalUsed = orders.reduce((total, order) => {
+        if (!shouldApplyAutomaticOutput(order.status)) return total;
+        if (editingOrder && order.id === editingOrder.id) return total;
+
+        const linkedOrderItem = order.items.find((item) => item.itemId === stockItem.linkedServiceId);
+        if (!linkedOrderItem || !stockItem.linkedServiceId) return total;
+
+        return total + linkedOrderItem.quantity * (stockItem.consumptionPerService ?? 1);
+      }, 0);
+
+      return {
+        stockItem,
+        baseAutomaticUsage: totalUsed,
+      };
+    });
+
+    return baseAutomaticUsage
+      .map(({ stockItem, baseAutomaticUsage }) => {
+        if (!stockItem.linkedServiceId) return null;
+
+        const draftOrderItem = selectedItems.find((item) => item.itemId === stockItem.linkedServiceId);
+        if (!draftOrderItem) return null;
+
+        const draftOutput = draftOrderItem.quantity * (stockItem.consumptionPerService ?? 1);
+        const availableBeforeDraft = stockItem.quantityCurrent - baseAutomaticUsage;
+        const projectedAvailable = availableBeforeDraft - draftOutput;
+        const linkedService = laundryItems.find((service) => service.id === stockItem.linkedServiceId);
+
+        return {
+          stockId: stockItem.id,
+          stockName: stockItem.name,
+          unit: stockItem.unit,
+          linkedServiceName: linkedService?.name ?? 'Serviço',
+          consumptionPerService: stockItem.consumptionPerService ?? 1,
+          draftOutput,
+          availableBeforeDraft,
+          projectedAvailable,
+          quantityMinimum: stockItem.quantityMinimum,
+          isCritical: projectedAvailable < 0,
+          isLow: projectedAvailable <= stockItem.quantityMinimum,
+        };
+      })
+      .filter((item): item is NonNullable<typeof item> => item !== null);
+  }, [editingOrder, laundryItems, orders, selectedItems, stockItems]);
+
+  const hasCriticalStockImpact = stockImpactPreview.some((impact) => impact.isCritical);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -223,6 +301,13 @@ export const Orders: React.FC<OrdersProps> = ({
       <div className="grid grid-cols-1 gap-4">
         {filteredOrders.map((order) => {
           const customer = customers.find(c => c.id === order.customerId);
+          const automaticStockItems = stockItems.filter((stockItem) =>
+            stockItem.linkedServiceId
+              ? order.items.some((orderItem) => orderItem.itemId === stockItem.linkedServiceId)
+              : false,
+          );
+          const hasAutomaticStockImpact = shouldApplyAutomaticOutput(order.status) && automaticStockItems.length > 0;
+
           return (
             <div key={order.id} className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-all group">
               <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
@@ -236,6 +321,15 @@ export const Orders: React.FC<OrdersProps> = ({
                       <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider border ${STATUS_COLORS[order.status]}`}>
                         {STATUS_LABELS[order.status]}
                       </span>
+                      {hasAutomaticStockImpact ? (
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider border border-emerald-200 bg-emerald-50 text-emerald-700">
+                          Baixa estoque
+                        </span>
+                      ) : automaticStockItems.length > 0 ? (
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider border border-slate-200 bg-slate-50 text-slate-600">
+                          Ligado ao estoque
+                        </span>
+                      ) : null}
                     </div>
                     <h4 className="font-bold text-slate-800 text-lg">{customer?.name}</h4>
                     <p className="text-sm text-slate-500 flex items-center gap-1">
@@ -246,6 +340,12 @@ export const Orders: React.FC<OrdersProps> = ({
                       <UserIcon className="w-3 h-3" />
                       {order.createdByUserRole === 'cashier' ? 'Caixa' : 'Operador'}: {order.createdByUserName || 'Sistema'}
                     </p>
+                    {automaticStockItems.length > 0 ? (
+                      <p className="text-xs text-slate-500 flex items-center gap-1 mt-1">
+                        <Boxes className="w-3 h-3" />
+                        {automaticStockItems.length} produto(s) do estoque vinculados a este pedido
+                      </p>
+                    ) : null}
                   </div>
                 </div>
 
@@ -463,6 +563,61 @@ export const Orders: React.FC<OrdersProps> = ({
                         })}
                       </div>
                     )}
+
+                    {stockError ? (
+                      <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-700">
+                        {stockError}
+                      </div>
+                    ) : !shouldApplyAutomaticOutput(editingOrder?.status ?? 'pending') ? (
+                      <div className="mt-4 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-500">
+                        Este pedido ainda não baixa estoque automaticamente enquanto estiver em estado pendente.
+                      </div>
+                    ) : stockImpactPreview.length > 0 ? (
+                      <div className="mt-4 rounded-xl border border-slate-200 bg-white p-3">
+                        <div className="mb-3 flex items-center gap-2">
+                          <Boxes className="w-4 h-4 text-slate-500" />
+                          <p className="text-sm font-semibold text-slate-700">Impacto no estoque deste pedido</p>
+                        </div>
+                        <div className="space-y-2">
+                          {stockImpactPreview.map((impact) => (
+                            <div key={impact.stockId} className="rounded-lg border border-slate-100 bg-slate-50 px-3 py-2">
+                              <div className="flex items-start justify-between gap-3">
+                                <div>
+                                  <p className="text-sm font-semibold text-slate-700">{impact.stockName}</p>
+                                  <p className="text-xs text-slate-500">
+                                    Serviço: {impact.linkedServiceName} • Consome {impact.consumptionPerService} por venda
+                                  </p>
+                                </div>
+                                <span
+                                  className={`rounded-full px-2 py-1 text-[10px] font-bold uppercase tracking-wider ${
+                                    impact.isCritical
+                                      ? 'bg-red-100 text-red-700'
+                                      : impact.isLow
+                                        ? 'bg-amber-100 text-amber-700'
+                                        : 'bg-emerald-100 text-emerald-700'
+                                  }`}
+                                >
+                                  {impact.isCritical ? 'Insuficiente' : impact.isLow ? 'Baixo' : 'OK'}
+                                </span>
+                              </div>
+                              <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-600">
+                                <span>Saída deste pedido: -{impact.draftOutput} {impact.unit}</span>
+                                <span>Disponível antes: {impact.availableBeforeDraft} {impact.unit}</span>
+                                <span>Disponível depois: {impact.projectedAvailable} {impact.unit}</span>
+                                <span>Mínimo: {impact.quantityMinimum} {impact.unit}</span>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ) : null}
+
+                    {hasCriticalStockImpact ? (
+                      <div className="mt-3 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs font-semibold text-red-700">
+                        O pedido não pode ser concluído com o impacto atual, porque deixaria o estoque negativo.
+                      </div>
+                    ) : null}
+
                     <div className="mt-4 pt-4 border-t border-slate-200 sticky bottom-0 bg-slate-50">
                       <div className="flex justify-between items-center mb-4">
                         <span className="text-sm font-bold text-slate-600">Total</span>
@@ -470,7 +625,7 @@ export const Orders: React.FC<OrdersProps> = ({
                       </div>
                       <button 
                         type="submit"
-                        disabled={!selectedCustomer || selectedItems.length === 0}
+                        disabled={!selectedCustomer || selectedItems.length === 0 || hasCriticalStockImpact}
                         className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 text-white py-3 rounded-xl font-bold transition-all shadow-lg shadow-blue-100 text-sm sm:text-base"
                       >
                         {editingOrder ? 'Salvar Alterações' : 'Finalizar Pedido'}

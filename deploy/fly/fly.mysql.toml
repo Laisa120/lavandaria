@@ -1,0 +1,29 @@
+app = "genomni-mysql"
+primary_region = "mad"
+
+[build]
+  image = "mysql:8.0"
+
+[env]
+  MYSQL_DATABASE = "lavasys"
+  MYSQL_USER = "user"
+  MYSQL_PASSWORD = "password"
+  MYSQL_ROOT_PASSWORD = "root"
+
+[[mounts]]
+  source = "genomni_mysql_data"
+  destination = "/var/lib/mysql"
+
+[[services]]
+  protocol = "tcp"
+  internal_port = 3306
+  processes = ["app"]
+
+  [[services.ports]]
+    port = 3306
+    handlers = []
+
+[[vm]]
+  cpu_kind = "shared"
+  cpus = 1
+  memory_mb = 1024
